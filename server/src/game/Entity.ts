@@ -67,7 +67,7 @@ export class ServerEntity {
     }
   }
 
-  serialize(): EntityState {
+  serialize(visible = true): EntityState {
     return {
       id: this.id,
       x: Math.round(this.x * 100) / 100,
@@ -78,6 +78,7 @@ export class ServerEntity {
       colorId: this.colorId,
       role: this.role,
       name: this.name,
+      visible,
     };
   }
 }
@@ -85,8 +86,11 @@ export class ServerEntity {
 export class SeekerBot extends ServerEntity {
   path: { x: number; y: number }[] = [];
   pathTimer = 0;
-  seekState: 'patrol' | 'chase' = 'patrol';
+  seekState: 'patrol' | 'chase' | 'investigate' = 'patrol';
   waitTimer = 0;
+  lastKnownTarget: { x: number; y: number } | null = null;
+  investigateTimer = 0;
+  currentTargetId: string | null = null;
 
   constructor(id: string, x: number, y: number) {
     super(id, x, y, 'Seeker', 'seeker');
@@ -99,9 +103,9 @@ export class SeekerBot extends ServerEntity {
 
     for (const hider of hiders) {
       if (hider.isDead) continue;
-      if (map.checkLineOfSight(this.x, this.y, hider.x, hider.y)) {
-        const d = Math.hypot(hider.x - this.x, hider.y - this.y);
-        if (d < minDist && d < SEEKER_VISION_RADIUS) {
+      const d = Math.hypot(hider.x - this.x, hider.y - this.y);
+      if (d < SEEKER_VISION_RADIUS && map.checkLineOfSight(this.x, this.y, hider.x, hider.y, SEEKER_VISION_RADIUS)) {
+        if (d < minDist) {
           minDist = d;
           closest = hider;
         }
@@ -110,7 +114,22 @@ export class SeekerBot extends ServerEntity {
 
     if (closest) {
       this.seekState = 'chase';
+      this.currentTargetId = closest.id;
+      this.lastKnownTarget = { x: closest.x, y: closest.y };
       this.path = map.findPath(this.x, this.y, closest.x, closest.y) || [];
+      this.investigateTimer = 0;
+    } else if (this.lastKnownTarget) {
+      this.seekState = 'investigate';
+      const distToLKP = Math.hypot(this.lastKnownTarget.x - this.x, this.lastKnownTarget.y - this.y);
+      if (distToLKP < 80 || this.investigateTimer > 4) {
+        this.lastKnownTarget = null;
+        this.currentTargetId = null;
+        this.seekState = 'patrol';
+        this.investigateTimer = 0;
+        this.path = [];
+      } else if (this.path.length === 0) {
+        this.path = map.findPath(this.x, this.y, this.lastKnownTarget.x, this.lastKnownTarget.y) || [];
+      }
     } else {
       this.seekState = 'patrol';
       if (this.path.length === 0) {
@@ -126,8 +145,13 @@ export class SeekerBot extends ServerEntity {
     this.waitTimer -= delta;
     this.pathTimer -= delta;
 
+    if (this.seekState === 'investigate') {
+      this.investigateTimer += delta;
+    }
+
+    const rethinkInterval = this.seekState === 'chase' ? 0.15 : this.seekState === 'investigate' ? 0.25 : 0.5;
     if (this.waitTimer <= 0 && this.pathTimer <= 0) {
-      this.pathTimer = 0.3 + Math.random() * 0.2;
+      this.pathTimer = rethinkInterval;
       this.think(hiders, map);
     }
 
@@ -144,7 +168,9 @@ export class SeekerBot extends ServerEntity {
         if (this.path.length === 0) {
           this.vx = 0;
           this.vy = 0;
-          this.waitTimer = this.seekState === 'chase' ? 0 : 1 + Math.random();
+          if (this.seekState === 'patrol') {
+            this.waitTimer = 0.3 + Math.random() * 0.5;
+          }
         }
       } else {
         this.vx = (dx / dist) * this.speed;

@@ -108,7 +108,8 @@ export function drawGame(
   ctx.fillStyle = '#8B0000';
   for (const b of bloodDecals) { ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); }
 
-  const sorted = [...entities].sort((a, b) => a.y - b.y);
+  const visibleEntities = entities.filter(e => e.visible);
+  const sorted = [...visibleEntities].sort((a, b) => a.y - b.y);
   for (const e of sorted) drawEntity(ctx, e, activeEmotes.get(e.id));
 
   for (const w of walls) {
@@ -270,11 +271,16 @@ function drawMinimap(
 
   for (const e of entities) {
     if (e.isDead) continue;
-    if (e.id === player.id) mCtx.fillStyle = '#3B82F6';
-    else if (e.role === 'seeker') mCtx.fillStyle = '#EF4444';
-    else mCtx.fillStyle = '#10B981';
+    if (e.id === player.id) {
+      mCtx.fillStyle = '#3B82F6';
+    } else if (e.role === 'seeker') {
+      mCtx.fillStyle = e.visible ? '#EF4444' : 'rgba(239,68,68,0.3)';
+    } else {
+      mCtx.fillStyle = e.visible ? '#10B981' : 'rgba(16,185,129,0.35)';
+    }
+    const dotSize = e.id === player.id ? 4 : e.visible ? 3 : 2;
     mCtx.beginPath();
-    mCtx.arc(e.x * sx, e.y * sy, 3, 0, Math.PI * 2);
+    mCtx.arc(e.x * sx, e.y * sy, dotSize, 0, Math.PI * 2);
     mCtx.fill();
   }
 }

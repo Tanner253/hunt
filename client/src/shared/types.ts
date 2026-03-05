@@ -8,6 +8,7 @@ export interface EntityState {
   colorId: string;
   role: 'seeker' | 'hider';
   name: string;
+  visible: boolean;
 }
 
 export interface GameState {

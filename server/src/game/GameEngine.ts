@@ -186,17 +186,15 @@ export class GameEngine {
     const player = this.players.get(playerId);
     if (!player) return null;
 
-    const entities: GameState['entities'] = [player.serialize()];
+    const entities: GameState['entities'] = [player.serialize(true)];
 
-    if (player.isDead || this.map.checkLineOfSight(player.x, player.y, this.seeker.x, this.seeker.y)) {
-      entities.push(this.seeker.serialize());
-    }
+    const seekerVisible = player.isDead || this.map.checkLineOfSight(player.x, player.y, this.seeker.x, this.seeker.y);
+    entities.push(this.seeker.serialize(seekerVisible));
 
     for (const [id, entity] of this.players) {
       if (id === playerId) continue;
-      if (player.isDead || this.map.checkLineOfSight(player.x, player.y, entity.x, entity.y)) {
-        entities.push(entity.serialize());
-      }
+      const canSee = player.isDead || this.map.checkLineOfSight(player.x, player.y, entity.x, entity.y);
+      entities.push(entity.serialize(canSee));
     }
 
     return {

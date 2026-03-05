@@ -136,8 +136,9 @@ export class GameMap {
     }
   }
 
-  checkLineOfSight(x1: number, y1: number, x2: number, y2: number): boolean {
-    if (Math.hypot(x2 - x1, y2 - y1) > VISION_RADIUS) return false;
+  checkLineOfSight(x1: number, y1: number, x2: number, y2: number, maxRange?: number): boolean {
+    const range = maxRange ?? VISION_RADIUS;
+    if (Math.hypot(x2 - x1, y2 - y1) > range) return false;
     for (const w of this.walls) {
       if (this.lineRectIntersect(x1, y1, x2, y2, w.x, w.y, w.w, w.h)) return false;
     }
@@ -185,7 +186,7 @@ export class GameMap {
     ];
 
     let iters = 0;
-    while (openList.length > 0 && iters < 500) {
+    while (openList.length > 0 && iters < 2000) {
       iters++;
       let lowestIdx = 0;
       for (let i = 1; i < openList.length; i++) {

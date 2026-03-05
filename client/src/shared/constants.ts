@@ -1,7 +1,7 @@
 export const TILE_SIZE = 60;
 export const PLAYER_RADIUS = 20;
 export const VISION_RADIUS = 500;
-export const SEEKER_VISION_RADIUS = 450;
+export const SEEKER_VISION_RADIUS = 700;
 export const PLAYER_SPEED = 180;
 export const SEEKER_SPEED = 200;
 export const SEEKER_BOOST_SPEED = 300;
