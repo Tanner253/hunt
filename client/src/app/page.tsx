@@ -8,6 +8,7 @@ import { LobbyBrowser } from '@/components/LobbyBrowser';
 import { AudioToggle } from '@/components/AudioToggle';
 import { CopyCA } from '@/components/CopyCA';
 import { WelcomePopup } from '@/components/WelcomePopup';
+import { BetaBanner } from '@/components/BetaBanner';
 
 export default function HomePage() {
   const router = useRouter();
@@ -210,6 +211,8 @@ export default function HomePage() {
           <kbd className="bg-gray-900 px-2 py-1 rounded text-gray-500 border border-gray-800">E</kbd>
           {' '}for emotes
         </div>
+
+        <BetaBanner />
       </div>
 
       <AudioToggle />
