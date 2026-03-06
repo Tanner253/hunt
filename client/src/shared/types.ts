@@ -68,6 +68,11 @@ export interface PlayerInput {
   seq: number;
 }
 
+export interface MapCandidate {
+  id: string;
+  name: string;
+}
+
 export interface LobbyInfo {
   id: string;
   name: string;
@@ -77,6 +82,8 @@ export interface LobbyInfo {
   isFree: boolean;
   votes: string[];
   spectators: number;
+  mapCandidates: MapCandidate[];
+  mapVotes: Record<string, string>;
 }
 
 export interface LobbyPlayerInfo {
@@ -133,6 +140,7 @@ export interface ClientToServerEvents {
   'lobby:vote-start': () => void;
   'lobby:chat': (text: string) => void;
   'lobby:move': (input: PlayerInput) => void;
+  'lobby:vote-map': (mapId: string) => void;
   'game:input': (input: PlayerInput) => void;
   'game:use-item': () => void;
   'game:emote': (emoteId: string) => void;

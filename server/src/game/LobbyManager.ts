@@ -1,5 +1,5 @@
 import { v4 as uuid } from 'uuid';
-import { LobbyInfo, LobbyPlayerInfo, LobbyPositionState, LobbyArenaState, LobbyCoin, ChatMessage } from '../shared/types';
+import { LobbyInfo, LobbyPlayerInfo, LobbyPositionState, LobbyArenaState, LobbyCoin, ChatMessage, MapCandidate } from '../shared/types';
 import {
   MAX_LOBBIES,
   MAX_PLAYERS_PER_LOBBY,
@@ -10,6 +10,7 @@ import {
   LOBBY_ARENA_H,
   PLAYER_SPEED,
 } from '../shared/constants';
+import { pickRandomMaps, MapDef, getMapById } from '../shared/maps';
 import { GameEngine } from './GameEngine';
 
 export interface LobbyPlayer {
@@ -45,6 +46,8 @@ export class Lobby {
   chatHistory: ChatMessage[] = [];
   lobbyCoins: LobbyCoin[] = [];
   lobbyCoinTimer = 0;
+  mapCandidates: MapDef[] = [];
+  mapVotes: Map<string, string> = new Map();
 
   constructor(id: string, name: string, maxPlayers: number, isFree: boolean) {
     this.id = id;
@@ -52,6 +55,7 @@ export class Lobby {
     this.maxPlayers = maxPlayers;
     this.isFree = isFree;
     this.spawnCoins(5);
+    this.rollMapCandidates();
   }
 
   private spawnCoins(count: number) {
@@ -123,6 +127,34 @@ export class Lobby {
     return voted / count >= 0.75;
   }
 
+  rollMapCandidates() {
+    this.mapCandidates = pickRandomMaps(3);
+    this.mapVotes.clear();
+  }
+
+  voteMap(playerId: string, mapId: string) {
+    if (!this.players.has(playerId)) return;
+    if (!this.mapCandidates.some((m) => m.id === mapId)) return;
+    this.mapVotes.set(playerId, mapId);
+  }
+
+  getWinningMap(): MapDef {
+    const counts: Record<string, number> = {};
+    for (const mapId of this.mapVotes.values()) {
+      counts[mapId] = (counts[mapId] || 0) + 1;
+    }
+    let best: string | null = null;
+    let bestCount = 0;
+    for (const [mapId, count] of Object.entries(counts)) {
+      if (count > bestCount) { best = mapId; bestCount = count; }
+    }
+    if (best) {
+      const found = this.mapCandidates.find((m) => m.id === best);
+      if (found) return found;
+    }
+    return this.mapCandidates[Math.floor(Math.random() * this.mapCandidates.length)];
+  }
+
   updateLobbyPositions(delta: number) {
     if (this.state === 'playing') return;
     const pad = 30;
@@ -180,6 +212,8 @@ export class Lobby {
   }
 
   getInfo(): LobbyInfo {
+    const mapVotesObj: Record<string, string> = {};
+    for (const [pid, mid] of this.mapVotes) mapVotesObj[pid] = mid;
     return {
       id: this.id,
       name: this.name,
@@ -194,6 +228,8 @@ export class Lobby {
       isFree: this.isFree,
       votes: Array.from(this.votes),
       spectators: this.spectators.size,
+      mapCandidates: this.mapCandidates.map((m) => ({ id: m.id, name: m.name })),
+      mapVotes: mapVotesObj,
     };
   }
 }
@@ -269,5 +305,6 @@ export class LobbyManager {
     lobby.state = 'waiting';
     lobby.votes.clear();
     for (const player of lobby.players.values()) player.hasVoted = false;
+    lobby.rollMapCandidates();
   }
 }

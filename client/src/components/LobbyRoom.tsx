@@ -3,8 +3,10 @@
 import { getSocket } from '@/lib/socket';
 import { LobbyInfo } from '@/shared/types';
 import { COLORS } from '@/shared/constants';
+import { getMapById } from '@/shared/maps';
 import { ChatPanel } from './ChatPanel';
 import { LobbyPlayground } from './LobbyPlayground';
+import { MapPreview } from './MapPreview';
 
 interface LobbyRoomProps {
   lobby: LobbyInfo;
@@ -118,8 +120,59 @@ export function LobbyRoom({ lobby, playerId, onLeave, countdown }: LobbyRoomProp
         )}
       </div>
 
+      {/* Map vote */}
+      {lobby.mapCandidates && lobby.mapCandidates.length > 0 && (
+        <MapVoteSection lobby={lobby} playerId={playerId} />
+      )}
+
       <LobbyPlayground playerId={playerId} />
       <ChatPanel lobbyId={lobby.id} />
+    </div>
+  );
+}
+
+function MapVoteSection({ lobby, playerId }: { lobby: LobbyInfo; playerId: string }) {
+  const myVote = lobby.mapVotes?.[playerId] || null;
+  const voteCounts: Record<string, number> = {};
+  if (lobby.mapVotes) {
+    for (const mapId of Object.values(lobby.mapVotes)) {
+      voteCounts[mapId] = (voteCounts[mapId] || 0) + 1;
+    }
+  }
+
+  const handleVote = (mapId: string) => {
+    getSocket().emit('lobby:vote-map', mapId);
+  };
+
+  return (
+    <div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5">
+      <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Vote for Map</h3>
+      <div className="grid grid-cols-3 gap-3">
+        {lobby.mapCandidates.map((candidate) => {
+          const mapDef = getMapById(candidate.id);
+          const votes = voteCounts[candidate.id] || 0;
+          const isSelected = myVote === candidate.id;
+          return (
+            <button
+              key={candidate.id}
+              onClick={() => handleVote(candidate.id)}
+              className={`flex flex-col items-center gap-2 rounded-xl p-3 transition-all ${
+                isSelected
+                  ? 'bg-blue-900/40 border-2 border-blue-500 shadow-[0_0_16px_rgba(59,130,246,0.25)]'
+                  : 'bg-gray-800/40 border-2 border-transparent hover:border-gray-600 hover:bg-gray-800/60'
+              }`}
+            >
+              {mapDef && <MapPreview grid={mapDef.grid} width={180} height={100} />}
+              <span className={`font-bold text-xs ${isSelected ? 'text-blue-400' : 'text-gray-300'}`}>
+                {candidate.name}
+              </span>
+              {votes > 0 && (
+                <span className="text-[10px] font-bold text-yellow-400">{votes} vote{votes !== 1 ? 's' : ''}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

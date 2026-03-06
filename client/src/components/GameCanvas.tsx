@@ -4,7 +4,8 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { getSocket } from '@/lib/socket';
 import { drawGame, initMapRendering, cleanupProjectileTrails } from '@/lib/renderer';
 import { GameState, EntityState, PlayerInput, GameOverData, ChatMessage } from '@/shared/types';
-import { MAP_DEFAULT, TICK_RATE } from '@/shared/constants';
+import { TICK_RATE } from '@/shared/constants';
+import { getMapById, MAP_POOL } from '@/shared/maps';
 import { useMobile } from '@/lib/useMobile';
 import { gameAudio } from '@/lib/audio';
 import { HUD } from './HUD';
@@ -16,11 +17,12 @@ import { InGameChat } from './InGameChat';
 
 interface Props {
   playerId: string;
+  mapId?: string;
   isSpectating?: boolean;
   onGameOver: (data: GameOverData) => void;
 }
 
-export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
+export function GameCanvas({ playerId, mapId, isSpectating, onGameOver }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const minimapRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<{ current: GameState | null; previous: GameState | null; lastUpdate: number }>({
@@ -46,7 +48,8 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
   useEffect(() => { chatOpenRef.current = showChat; }, [showChat]);
 
   useEffect(() => {
-    initMapRendering(MAP_DEFAULT);
+    const mapDef = mapId ? getMapById(mapId) : undefined;
+    initMapRendering(mapDef?.grid || MAP_POOL[0].grid);
     gameAudio.init();
     const socket = getSocket();
 
@@ -143,7 +146,7 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
       socket.off('lobby:chat', onChat);
       gameAudio.stopMusic();
     };
-  }, [onGameOver, playerId, isDead]);
+  }, [onGameOver, playerId, isDead, mapId]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {

@@ -20,6 +20,7 @@ export default function GamePage() {
   const [pageState, setPageState] = useState<PageState>('joining');
   const [lobby, setLobby] = useState<LobbyInfo | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
+  const [mapId, setMapId] = useState<string>('station-alpha');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [gameOverData, setGameOverData] = useState<GameOverData | null>(null);
   const pageStateRef = useRef<PageState>('joining');
@@ -66,6 +67,7 @@ export default function GamePage() {
     });
     socket.on('game:start', (data) => {
       setPlayerId(data.yourId);
+      setMapId(data.mapId || 'station-alpha');
       setCountdown(0);
       gameAudio.stopMusic();
       gameAudio.playGameStart();
@@ -128,6 +130,7 @@ export default function GamePage() {
       <>
         <GameCanvas
           playerId={playerId}
+          mapId={mapId}
           isSpectating={pageState === 'spectating'}
           onGameOver={handleGameOver}
         />

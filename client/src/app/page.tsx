@@ -66,7 +66,7 @@ export default function HomePage() {
           className="absolute inset-0"
           style={{
             backgroundImage:
-              'linear-gradient(rgba(245,245,87,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(245,245,87,0.04) 1px, transparent 1px)',
+              'linear-gradient(rgba(3,225,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(3,225,255,0.04) 1px, transparent 1px)',
             backgroundSize: '60px 60px',
             animation: 'grid-pulse 4s ease-in-out infinite',
           }}
@@ -79,7 +79,7 @@ export default function HomePage() {
               width: 4 + Math.random() * 4,
               height: 4 + Math.random() * 4,
               left: `${Math.random() * 100}%`,
-              backgroundColor: ['#F5F557', '#C51111', '#132ED1', '#117F2D', '#ED54BA'][i % 5],
+              backgroundColor: ['#00FFA3', '#03E1FF', '#DC1FFF', '#9945FF', '#14F195'][i % 5],
               opacity: 0,
               animation: `float-up ${8 + Math.random() * 12}s linear ${Math.random() * 10}s infinite`,
             }}
@@ -92,28 +92,26 @@ export default function HomePage() {
         {/* Header */}
         <div className="text-center mb-12">
           <div className="inline-block mb-6">
-            <h1
-              className="text-7xl md:text-9xl font-black tracking-tighter leading-none"
-              style={{
-                color: '#F5F557',
-                textShadow: '0 0 60px rgba(245,245,87,0.25), 0 0 120px rgba(245,245,87,0.1)',
-              }}
-            >
-              HIDE
-            </h1>
-            <div className="flex items-center justify-center gap-4 -mt-2">
-              <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent to-yellow-500/40" />
-              <span className="text-2xl md:text-3xl font-black text-gray-500 tracking-[0.3em]">&amp;</span>
-              <div className="h-[2px] flex-1 bg-gradient-to-l from-transparent to-yellow-500/40" />
-            </div>
-            <h1
-              className="text-7xl md:text-9xl font-black tracking-tighter leading-none -mt-2"
-              style={{
-                color: '#C51111',
-                textShadow: '0 0 60px rgba(197,17,17,0.25), 0 0 120px rgba(197,17,17,0.1)',
-              }}
-            >
-              SEEK
+            <h1 className="text-7xl md:text-9xl font-black tracking-tighter leading-none">
+              <span
+                className="inline-block"
+                style={{
+                  background: 'linear-gradient(135deg, #00FFA3, #03E1FF, #DC1FFF)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  filter: 'drop-shadow(0 0 40px rgba(3,225,255,0.3)) drop-shadow(0 0 80px rgba(220,31,255,0.15))',
+                }}
+              >
+                SOL
+              </span>
+              <span
+                style={{
+                  color: '#E2E8F0',
+                  textShadow: '0 0 40px rgba(226,232,240,0.15)',
+                }}
+              >
+                vivors
+              </span>
             </h1>
           </div>
 
@@ -150,7 +148,7 @@ export default function HomePage() {
               onChange={(e) => setPlayerName(e.target.value)}
               placeholder="What should we call you?"
               maxLength={20}
-              className="w-full bg-gray-900/80 text-white px-5 py-4 rounded-2xl border border-gray-800 focus:border-yellow-500/50 outline-none text-lg font-bold placeholder:text-gray-700 transition-colors"
+              className="w-full bg-gray-900/80 text-white px-5 py-4 rounded-2xl border border-gray-800 focus:border-cyan-500/50 outline-none text-lg font-bold placeholder:text-gray-700 transition-colors"
             />
             {playerName.trim() && (
               <div className="absolute right-4 top-1/2 -translate-y-1/2 text-green-500 text-xl">&#10003;</div>

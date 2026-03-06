@@ -49,6 +49,7 @@ interface StinkProjectile {
 
 export class GameEngine {
   id: string;
+  mapId: string;
   map: GameMap;
   players: Map<string, ServerEntity> = new Map();
   seeker: SeekerBot;
@@ -68,10 +69,13 @@ export class GameEngine {
     id: string,
     playerInfos: { id: string; name: string; colorId: string }[],
     callbacks: GameEventCallbacks,
+    mapGrid?: string[],
+    mapId?: string,
   ) {
     this.id = id;
+    this.mapId = mapId || 'station-alpha';
     this.callbacks = callbacks;
-    this.map = new GameMap(MAP_DEFAULT);
+    this.map = new GameMap(mapGrid || MAP_DEFAULT);
     this.timer = HIDE_TIME;
     this.startTime = Date.now();
 

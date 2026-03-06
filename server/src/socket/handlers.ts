@@ -105,6 +105,14 @@ export function registerSocketHandlers(io: IO, lobbyManager: LobbyManager) {
       player.lobbyVy = vy;
     });
 
+    socket.on('lobby:vote-map', (mapId: string) => {
+      const lobby = lobbyManager.getPlayerLobby(socket.id);
+      const playerId = lobbyManager.getPlayerId(socket.id);
+      if (!lobby || !playerId) return;
+      lobby.voteMap(playerId, mapId);
+      io.to(`lobby:${lobby.id}`).emit('lobby:state', lobby.getInfo());
+    });
+
     socket.on('game:input', (input: PlayerInput) => {
       const lobby = lobbyManager.getPlayerLobby(socket.id);
       const playerId = lobbyManager.getPlayerId(socket.id);
@@ -139,7 +147,7 @@ export function registerSocketHandlers(io: IO, lobbyManager: LobbyManager) {
       const watchingId = playerIds[0];
       lobby.spectators.set(socket.id, { socketId: socket.id, watchingPlayerId: watchingId });
       socket.join(`lobby:${lobbyId}`);
-      socket.emit('game:start', { mapId: 'default', yourId: watchingId, colorId: 'spectator' });
+      socket.emit('game:start', { mapId: lobby.game.mapId, yourId: watchingId, colorId: 'spectator' });
     });
 
     socket.on('spectate:switch', (direction) => {
@@ -151,7 +159,7 @@ export function registerSocketHandlers(io: IO, lobbyManager: LobbyManager) {
         const idx = ids.indexOf(spectator.watchingPlayerId || '');
         const next = direction === 'next' ? (idx + 1) % ids.length : (idx - 1 + ids.length) % ids.length;
         spectator.watchingPlayerId = ids[next];
-        socket.emit('game:start', { mapId: 'default', yourId: ids[next], colorId: 'spectator' });
+        socket.emit('game:start', { mapId: lobby.game.mapId, yourId: ids[next], colorId: 'spectator' });
       }
     });
 
@@ -197,6 +205,7 @@ function startCountdown(io: IO, lm: LobbyManager, lobby: Lobby) {
 
 function startGame(io: IO, lm: LobbyManager, lobby: Lobby) {
   lobby.state = 'playing';
+  const chosenMap = lobby.getWinningMap();
   const playerInfos = Array.from(lobby.players.values()).map((p) => ({
     id: p.id,
     name: p.name,
@@ -232,10 +241,10 @@ function startGame(io: IO, lm: LobbyManager, lobby: Lobby) {
     },
   };
 
-  lobby.game = new GameEngine(lobby.id, playerInfos, callbacks);
+  lobby.game = new GameEngine(lobby.id, playerInfos, callbacks, chosenMap.grid, chosenMap.id);
   for (const player of lobby.players.values()) {
     io.to(player.socketId).emit('game:start', {
-      mapId: 'default',
+      mapId: chosenMap.id,
       yourId: player.id,
       colorId: player.colorId,
     });

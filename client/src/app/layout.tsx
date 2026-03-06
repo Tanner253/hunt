@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Hide & Seek: Survival',
-  description: 'Multiplayer hide and seek survival game',
+  title: 'SOLvivors',
+  description: 'Multiplayer survival game — last one standing wins',
 };
 
 export const viewport: Viewport = {
