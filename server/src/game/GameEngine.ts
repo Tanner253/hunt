@@ -12,10 +12,12 @@ import {
   STINK_DURATION,
   STINK_PROJECTILE_SPEED,
   STINK_PROJECTILE_RADIUS,
+  SPEED_BOOST_DURATION,
   POWERUP_SPAWN_INTERVAL,
   POWERUP_PICKUP_RADIUS,
   POWERUP_MAX_ON_MAP,
   MAP_DEFAULT,
+  ItemType,
 } from '../shared/constants';
 
 export interface GameEventCallbacks {
@@ -23,13 +25,17 @@ export interface GameEventCallbacks {
   onGameOver: (data: GameOverData) => void;
   onKill: (victimId: string, victimName: string, x: number, y: number) => void;
   onMarked: (markerId: string, victimId: string, victimName: string) => void;
+  onShieldBreak?: (playerId: string) => void;
 }
 
 interface PowerUp {
   id: string;
   x: number;
   y: number;
+  itemType: ItemType;
 }
+
+const ITEM_TYPES: ItemType[] = ['stink', 'speed', 'shield'];
 
 interface StinkProjectile {
   id: string;
@@ -113,18 +119,29 @@ export class GameEngine {
   useItem(playerId: string) {
     const player = this.players.get(playerId);
     if (!player || player.isDead || !player.heldItem) return;
-    const hiders = Array.from(this.players.values());
-    const result = player.useStinkBomb(hiders, this.map);
-    if (result) {
-      this.projectiles.push({
-        id: uuid(),
-        x: player.x,
-        y: player.y,
-        vx: result.dx * STINK_PROJECTILE_SPEED,
-        vy: result.dy * STINK_PROJECTILE_SPEED,
-        ownerId: playerId,
-        life: 1.5,
-      });
+    const itemType = player.heldItem;
+
+    if (itemType === 'stink') {
+      const hiders = Array.from(this.players.values());
+      const result = player.useStinkBomb(hiders, this.map);
+      if (result) {
+        player.heldItem = null;
+        this.projectiles.push({
+          id: uuid(),
+          x: player.x,
+          y: player.y,
+          vx: result.dx * STINK_PROJECTILE_SPEED,
+          vy: result.dy * STINK_PROJECTILE_SPEED,
+          ownerId: playerId,
+          life: 1.5,
+        });
+      }
+    } else if (itemType === 'speed') {
+      player.heldItem = null;
+      player.speedBoostUntil = Date.now() + SPEED_BOOST_DURATION * 1000;
+    } else if (itemType === 'shield') {
+      player.heldItem = null;
+      player.shieldActive = true;
     }
   }
 
@@ -171,18 +188,20 @@ export class GameEngine {
 
     for (const [, entity] of this.players) {
       if (entity.isDead) continue;
+      entity.updateSpeed();
+      const moveSpeed = entity.speed;
       const input = entity.pendingInput;
       if (input) {
         entity.vx = 0;
         entity.vy = 0;
-        if (input.up) entity.vy = -PLAYER_SPEED;
-        if (input.down) entity.vy = PLAYER_SPEED;
-        if (input.left) entity.vx = -PLAYER_SPEED;
-        if (input.right) entity.vx = PLAYER_SPEED;
+        if (input.up) entity.vy = -moveSpeed;
+        if (input.down) entity.vy = moveSpeed;
+        if (input.left) entity.vx = -moveSpeed;
+        if (input.right) entity.vx = moveSpeed;
         if (entity.vx !== 0 && entity.vy !== 0) {
           const len = Math.hypot(entity.vx, entity.vy);
-          entity.vx = (entity.vx / len) * PLAYER_SPEED;
-          entity.vy = (entity.vy / len) * PLAYER_SPEED;
+          entity.vx = (entity.vx / len) * moveSpeed;
+          entity.vy = (entity.vy / len) * moveSpeed;
         }
       } else {
         entity.vx = 0;
@@ -229,7 +248,8 @@ export class GameEngine {
     this.powerUpSpawnTimer -= delta;
     if (this.powerUpSpawnTimer <= 0 && this.powerUps.length < POWERUP_MAX_ON_MAP) {
       const pos = this.map.getRandomWalkablePos();
-      this.powerUps.push({ id: uuid(), x: pos.x, y: pos.y });
+      const itemType = ITEM_TYPES[Math.floor(Math.random() * ITEM_TYPES.length)];
+      this.powerUps.push({ id: uuid(), x: pos.x, y: pos.y, itemType });
       this.powerUpSpawnTimer = POWERUP_SPAWN_INTERVAL;
     }
 
@@ -238,7 +258,7 @@ export class GameEngine {
       for (let i = this.powerUps.length - 1; i >= 0; i--) {
         const pu = this.powerUps[i];
         if (Math.hypot(entity.x - pu.x, entity.y - pu.y) < POWERUP_PICKUP_RADIUS) {
-          entity.heldItem = 'stink';
+          entity.heldItem = pu.itemType;
           this.powerUps.splice(i, 1);
           break;
         }
@@ -251,6 +271,11 @@ export class GameEngine {
       if (entity.isDead) continue;
       const dist = Math.hypot(entity.x - this.seeker.x, entity.y - this.seeker.y);
       if (dist < PLAYER_RADIUS * 2) {
+        if (entity.shieldActive) {
+          entity.shieldActive = false;
+          this.callbacks.onShieldBreak?.(entity.id);
+          continue;
+        }
         entity.isDead = true;
         entity.deathTime = Date.now();
         this.deathOrder.push({
@@ -303,7 +328,7 @@ export class GameEngine {
       phase: this.phase,
       entities,
       hidersAlive: this.getAliveHiders().length,
-      powerUps: this.powerUps.map((p) => ({ id: p.id, x: p.x, y: p.y })),
+      powerUps: this.powerUps.map((p) => ({ id: p.id, x: p.x, y: p.y, itemType: p.itemType })),
       projectiles: this.projectiles.map((p) => ({ id: p.id, x: Math.round(p.x), y: Math.round(p.y) })),
     };
   }

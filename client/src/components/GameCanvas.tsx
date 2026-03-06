@@ -83,9 +83,8 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
         }
       }
 
-      // Power-up pickup detection
       if (me?.hasItem && !lastHasItemRef.current) gameAudio.playPowerUp();
-      lastHasItemRef.current = me?.hasItem || false;
+      lastHasItemRef.current = !!me?.hasItem;
     };
     const onKill = (data: { victimId: string; x: number; y: number }) => {
       for (let i = 0; i < 5; i++) {
@@ -109,6 +108,13 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
         setTimeout(() => setStinkToast(null), 4000);
       }
     };
+    const onShieldBreak = (data: { playerId: string }) => {
+      if (data.playerId === playerId) {
+        setStinkToast('Your shield absorbed a hit!');
+        setTimeout(() => setStinkToast(null), 3000);
+      }
+      gameAudio.playMarked();
+    };
     const onChat = (msg: ChatMessage) => {
       chatBubblesRef.current.set(msg.senderId, msg.text);
       const text = msg.text;
@@ -124,6 +130,7 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
     socket.on('game:emote', onEmote);
     socket.on('game:over', onGameOver);
     socket.on('game:marked', onMarked);
+    socket.on('game:shield-break' as any, onShieldBreak);
     socket.on('lobby:chat', onChat);
 
     return () => {
@@ -132,6 +139,7 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
       socket.off('game:emote', onEmote);
       socket.off('game:over', onGameOver);
       socket.off('game:marked', onMarked);
+      socket.off('game:shield-break' as any, onShieldBreak);
       socket.off('lobby:chat', onChat);
       gameAudio.stopMusic();
     };
@@ -255,7 +263,9 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
   }, []);
 
   const me = gameState?.entities.find((e) => e.id === playerId);
-  const hasItem = me?.hasItem || false;
+  const hasItem = me?.hasItem || null;
+  const hasShield = me?.hasShield || false;
+  const isBoosted = me?.isBoosted || false;
 
   return (
     <div className="relative w-screen h-screen overflow-hidden">
@@ -266,7 +276,7 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
         width={200}
         height={112}
       />
-      <HUD gameState={gameState} hasItem={hasItem} />
+      <HUD gameState={gameState} hasItem={hasItem} hasShield={hasShield} isBoosted={isBoosted} />
       <KillFeed />
       <DeathScreen visible={isDead} />
 

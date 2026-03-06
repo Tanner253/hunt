@@ -7,8 +7,12 @@ interface MobileControlsProps {
   onEmotePress: () => void;
   onChatPress: () => void;
   onUseItem?: () => void;
-  hasItem?: boolean;
+  hasItem?: string | null;
 }
+
+const ITEM_EMOJI: Record<string, string> = {
+  stink: '\u{1F4A8}', speed: '\u{26A1}', shield: '\u{1F6E1}\u{FE0F}',
+};
 
 export function MobileControls({ onJoystickInput, onEmotePress, onChatPress, onUseItem, hasItem }: MobileControlsProps) {
   return (
@@ -21,7 +25,7 @@ export function MobileControls({ onJoystickInput, onEmotePress, onChatPress, onU
             onTouchStart={(e) => { e.preventDefault(); onUseItem(); }}
             className="w-16 h-16 rounded-full bg-green-500/20 border-2 border-green-400/40 flex items-center justify-center text-2xl active:bg-green-500/40 transition-colors animate-pulse"
           >
-            {'\u{1F4A8}'}
+            {ITEM_EMOJI[hasItem] || '\u{1F4A8}'}
           </button>
         )}
         <button

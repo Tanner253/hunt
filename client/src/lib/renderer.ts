@@ -197,15 +197,22 @@ function drawShadows(
   }
 }
 
+const POWERUP_STYLE: Record<string, { color: string; emoji: string }> = {
+  stink:  { color: '#22CC44', emoji: '\u{1F4A8}' },
+  speed:  { color: '#3B82F6', emoji: '\u{26A1}'  },
+  shield: { color: '#EAB308', emoji: '\u{1F6E1}\u{FE0F}'  },
+};
+
 function drawPowerUp(ctx: CanvasRenderingContext2D, pu: PowerUpState) {
+  const style = POWERUP_STYLE[pu.itemType] || POWERUP_STYLE.stink;
   ctx.save();
   ctx.translate(pu.x, pu.y);
   const pulse = 0.8 + Math.sin(Date.now() / 300) * 0.2;
   const r = 14 * pulse;
 
-  ctx.shadowColor = '#22CC44';
+  ctx.shadowColor = style.color;
   ctx.shadowBlur = 20;
-  ctx.fillStyle = '#22CC44';
+  ctx.fillStyle = style.color;
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.fill();
@@ -215,7 +222,7 @@ function drawPowerUp(ctx: CanvasRenderingContext2D, pu: PowerUpState) {
   ctx.font = 'bold 14px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('\u{1F4A8}', 0, 0);
+  ctx.fillText(style.emoji, 0, 0);
   ctx.restore();
 }
 
@@ -404,10 +411,43 @@ function drawEntity(ctx: CanvasRenderingContext2D, e: EntityState) {
   }
 
   if (e.hasItem) {
+    const style = POWERUP_STYLE[e.hasItem] || POWERUP_STYLE.stink;
     ctx.font = '14px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('\u{1F4A8}', PR + 12, -PR + 4);
+    ctx.fillText(style.emoji, PR + 12, -PR + 4);
   }
+
+  if (e.hasShield) {
+    const t = Date.now() / 500;
+    ctx.globalAlpha = 0.25 + Math.sin(t) * 0.1;
+    ctx.strokeStyle = '#EAB308';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, PR + 8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.08;
+    ctx.fillStyle = '#EAB308';
+    ctx.beginPath();
+    ctx.arc(0, 0, PR + 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  if (e.isBoosted) {
+    const t = Date.now() / 200;
+    for (let i = 0; i < 3; i++) {
+      const trail = ((t + i * 1.2) % 3);
+      const tx = -(trail * 8) - 10;
+      const ty = PR - 6 + Math.sin(t + i) * 3;
+      ctx.globalAlpha = Math.max(0, 0.5 - trail * 0.15);
+      ctx.fillStyle = '#60A5FA';
+      ctx.beginPath();
+      ctx.arc(tx, ty, 3 + trail, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
   ctx.restore();
 }
 

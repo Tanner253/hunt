@@ -227,6 +227,9 @@ function startGame(io: IO, lm: LobbyManager, lobby: Lobby) {
     onMarked: (markerId: string, victimId: string, victimName: string) => {
       io.to(`lobby:${lobby.id}`).emit('game:marked', { markerId, victimId, victimName });
     },
+    onShieldBreak: (playerId: string) => {
+      io.to(`lobby:${lobby.id}`).emit('game:shield-break', { playerId });
+    },
   };
 
   lobby.game = new GameEngine(lobby.id, playerInfos, callbacks);

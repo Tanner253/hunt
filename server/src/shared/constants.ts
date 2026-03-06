@@ -13,9 +13,14 @@ export const STINK_DURATION = 8;
 export const STINK_RANGE = 250;
 export const STINK_PROJECTILE_SPEED = 500;
 export const STINK_PROJECTILE_RADIUS = 12;
-export const POWERUP_SPAWN_INTERVAL = 12;
+export const SPEED_BOOST_DURATION = 5;
+export const SPEED_BOOST_MULTIPLIER = 1.5;
+export const SHIELD_FLASH_DURATION = 1;
+export const POWERUP_SPAWN_INTERVAL = 10;
 export const POWERUP_PICKUP_RADIUS = 40;
-export const POWERUP_MAX_ON_MAP = 3;
+export const POWERUP_MAX_ON_MAP = 5;
+
+export type ItemType = 'stink' | 'speed' | 'shield';
 
 export const LOBBY_ARENA_W = 600;
 export const LOBBY_ARENA_H = 400;

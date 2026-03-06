@@ -5,6 +5,8 @@ import {
   SEEKER_SPEED,
   SEEKER_VISION_RADIUS,
   STINK_RANGE,
+  SPEED_BOOST_MULTIPLIER,
+  ItemType,
 } from '../shared/constants';
 import { EntityState, PlayerInput } from '../shared/types';
 import { GameMap, Wall } from './Map';
@@ -17,6 +19,7 @@ export class ServerEntity {
   vy = 0;
   radius = PLAYER_RADIUS;
   speed: number;
+  baseSpeed: number;
   colorId: string;
   role: 'seeker' | 'hider';
   name = '';
@@ -27,7 +30,9 @@ export class ServerEntity {
   walkCycle = 0;
   pendingInput: PlayerInput | null = null;
   markedUntil = 0;
-  heldItem: 'stink' | null = null;
+  heldItem: ItemType | null = null;
+  shieldActive = false;
+  speedBoostUntil = 0;
 
   constructor(id: string, x: number, y: number, colorId: string, role: 'seeker' | 'hider') {
     this.id = id;
@@ -35,11 +40,21 @@ export class ServerEntity {
     this.y = y;
     this.colorId = colorId;
     this.role = role;
-    this.speed = role === 'seeker' ? SEEKER_SPEED : PLAYER_SPEED;
+    this.baseSpeed = role === 'seeker' ? SEEKER_SPEED : PLAYER_SPEED;
+    this.speed = this.baseSpeed;
   }
 
   get isMarked(): boolean {
     return this.markedUntil > Date.now();
+  }
+
+  get isBoosted(): boolean {
+    return this.speedBoostUntil > Date.now();
+  }
+
+  updateSpeed() {
+    if (this.role === 'seeker') return;
+    this.speed = this.isBoosted ? this.baseSpeed * SPEED_BOOST_MULTIPLIER : this.baseSpeed;
   }
 
   update(delta: number, walls: Wall[]) {
@@ -75,8 +90,7 @@ export class ServerEntity {
   }
 
   useStinkBomb(allHiders: ServerEntity[], map: GameMap): { target: ServerEntity; dx: number; dy: number } | null {
-    if (this.heldItem !== 'stink' || this.isDead) return null;
-    this.heldItem = null;
+    if (this.isDead) return null;
     let closest: ServerEntity | null = null;
     let minDist = Infinity;
     for (const other of allHiders) {
@@ -107,7 +121,9 @@ export class ServerEntity {
       name: this.name,
       visible,
       isMarked: this.isMarked,
-      hasItem: this.heldItem !== null,
+      hasItem: this.heldItem,
+      hasShield: this.shieldActive,
+      isBoosted: this.isBoosted,
     };
   }
 }
@@ -179,8 +195,55 @@ export class SeekerBot extends ServerEntity {
     }
   }
 
+  private updateOvertimeAI(delta: number, hiders: ServerEntity[], map: GameMap) {
+    let closest: ServerEntity | null = null;
+    let minDist = Infinity;
+    for (const h of hiders) {
+      if (h.isDead) continue;
+      const d = Math.hypot(h.x - this.x, h.y - this.y);
+      if (d < minDist) { minDist = d; closest = h; }
+    }
+    if (!closest) { this.vx = 0; this.vy = 0; return; }
+
+    if (minDist < 150) {
+      const dx = closest.x - this.x;
+      const dy = closest.y - this.y;
+      this.vx = (dx / minDist) * this.speed;
+      this.vy = (dy / minDist) * this.speed;
+    } else {
+      const path = map.findPath(this.x, this.y, closest.x, closest.y);
+      if (path && path.length > 0) {
+        const skipTo = Math.min(path.length - 1, 4);
+        const wp = path[skipTo];
+        const tx = wp.x * TILE_SIZE + TILE_SIZE / 2;
+        const ty = wp.y * TILE_SIZE + TILE_SIZE / 2;
+        const dx = tx - this.x;
+        const dy = ty - this.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 1) {
+          this.vx = (dx / dist) * this.speed;
+          this.vy = (dy / dist) * this.speed;
+        }
+      } else {
+        const dx = closest.x - this.x;
+        const dy = closest.y - this.y;
+        if (minDist > 1) {
+          this.vx = (dx / minDist) * this.speed;
+          this.vy = (dy / minDist) * this.speed;
+        }
+      }
+    }
+
+    this.update(delta, map.walls);
+  }
+
   updateAI(delta: number, hiders: ServerEntity[], map: GameMap, overtime = false) {
     if (this.isDead) return;
+
+    if (overtime) {
+      this.updateOvertimeAI(delta, hiders, map);
+      return;
+    }
 
     this.waitTimer -= delta;
     this.pathTimer -= delta;
@@ -189,10 +252,10 @@ export class SeekerBot extends ServerEntity {
       this.investigateTimer += delta;
     }
 
-    const rethinkInterval = overtime ? 0.1 : this.seekState === 'chase' ? 0.15 : this.seekState === 'investigate' ? 0.25 : 0.5;
+    const rethinkInterval = this.seekState === 'chase' ? 0.15 : this.seekState === 'investigate' ? 0.25 : 0.5;
     if (this.waitTimer <= 0 && this.pathTimer <= 0) {
       this.pathTimer = rethinkInterval;
-      this.think(hiders, map, overtime);
+      this.think(hiders, map);
     }
 
     const arrivalThreshold = Math.max(10, this.speed * delta * 1.5);

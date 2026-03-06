@@ -10,13 +10,16 @@ export interface EntityState {
   name: string;
   visible: boolean;
   isMarked: boolean;
-  hasItem: boolean;
+  hasItem: string | null;
+  hasShield: boolean;
+  isBoosted: boolean;
 }
 
 export interface PowerUpState {
   id: string;
   x: number;
   y: number;
+  itemType: string;
 }
 
 export interface StinkProjectileState {
@@ -116,6 +119,7 @@ export interface ServerToClientEvents {
   'game:kill': (data: { victimId: string; victimName: string; x: number; y: number }) => void;
   'game:emote': (data: EmoteEvent) => void;
   'game:marked': (data: { markerId: string; victimId: string; victimName: string }) => void;
+  'game:shield-break': (data: { playerId: string }) => void;
   'error': (message: string) => void;
 }
 
