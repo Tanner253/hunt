@@ -9,6 +9,13 @@ export const TICK_RATE = 20;
 export const ROUND_TIME = 120;
 export const HIDE_TIME = 15;
 
+export const STINK_DURATION = 8;
+export const STINK_RANGE = 250;
+export const POWERUP_PICKUP_RADIUS = 40;
+
+export const LOBBY_ARENA_W = 600;
+export const LOBBY_ARENA_H = 400;
+
 export const MAX_LOBBIES = 10;
 export const MAX_PLAYERS_PER_LOBBY = 10;
 export const FREE_LOBBY_MAX_PLAYERS = 25;

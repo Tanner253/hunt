@@ -1,5 +1,5 @@
 import { TILE_SIZE, VISION_RADIUS, COLORS, EMOTES } from '@/shared/constants';
-import { EntityState } from '@/shared/types';
+import { EntityState, PowerUpState } from '@/shared/types';
 
 interface Wall { x: number; y: number; w: number; h: number }
 interface Segment { p1: { x: number; y: number }; p2: { x: number; y: number } }
@@ -87,6 +87,7 @@ export function drawGame(
   bloodDecals: { x: number; y: number; r: number }[],
   W: number, H: number,
   activeEmotes: Map<string, string>,
+  powerUps: PowerUpState[],
 ) {
   const player = entities.find(e => e.id === playerId);
   if (!player) return;
@@ -107,6 +108,8 @@ export function drawGame(
 
   ctx.fillStyle = '#8B0000';
   for (const b of bloodDecals) { ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); }
+
+  for (const pu of powerUps) drawPowerUp(ctx, pu);
 
   const visibleEntities = entities.filter(e => e.visible);
   const sorted = [...visibleEntities].sort((a, b) => a.y - b.y);
@@ -189,6 +192,28 @@ function drawShadows(
   }
 }
 
+function drawPowerUp(ctx: CanvasRenderingContext2D, pu: PowerUpState) {
+  ctx.save();
+  ctx.translate(pu.x, pu.y);
+  const pulse = 0.8 + Math.sin(Date.now() / 300) * 0.2;
+  const r = 14 * pulse;
+
+  ctx.shadowColor = '#22CC44';
+  ctx.shadowBlur = 20;
+  ctx.fillStyle = '#22CC44';
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.font = 'bold 14px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('\u{1F4A8}', 0, 0);
+  ctx.restore();
+}
+
 const PR = 20;
 
 function drawEntity(ctx: CanvasRenderingContext2D, e: EntityState, emoteId?: string) {
@@ -243,6 +268,27 @@ function drawEntity(ctx: CanvasRenderingContext2D, e: EntityState, emoteId?: str
   ctx.fillRect(-tw / 2 - 4, -PR - 22, tw + 8, 16);
   ctx.fillStyle = '#ffffff';
   ctx.fillText(name, 0, -PR - 10);
+
+  if (e.isMarked) {
+    const t = Date.now() / 400;
+    ctx.globalAlpha = 0.3 + Math.sin(t) * 0.15;
+    ctx.fillStyle = '#44DD22';
+    for (let i = 0; i < 5; i++) {
+      const angle = t + i * (Math.PI * 2 / 5);
+      const ox = Math.cos(angle) * 22;
+      const oy = Math.sin(angle) * 16 - 5;
+      ctx.beginPath();
+      ctx.arc(ox, oy, 8 + Math.sin(t + i) * 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  if (e.hasItem) {
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('\u{1F4A8}', PR + 12, -PR + 4);
+  }
 
   if (emoteId) {
     const emote = EMOTES.find(em => em.id === emoteId);

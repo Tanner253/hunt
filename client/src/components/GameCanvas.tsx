@@ -88,6 +88,10 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
         e.preventDefault();
         setShowChat(true);
       }
+      if (e.code === 'Space') {
+        e.preventDefault();
+        getSocket().emit('game:use-item');
+      }
     };
     const up = (e: KeyboardEvent) => {
       keysRef.current[e.code] = false;
@@ -150,6 +154,7 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
           cameraRef.current, ents, playerId,
           bloodRef.current, canvas.width, canvas.height,
           emotesRef.current,
+          state.powerUps || [],
         );
       }
       requestAnimationFrame(loop);
@@ -168,6 +173,13 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
     joystickRef.current = { dx, dy };
   }, []);
 
+  const handleUseItem = useCallback(() => {
+    getSocket().emit('game:use-item');
+  }, []);
+
+  const me = gameState?.entities.find((e) => e.id === playerId);
+  const hasItem = me?.hasItem || false;
+
   return (
     <div className="relative w-screen h-screen overflow-hidden">
       <canvas ref={canvasRef} className="block" />
@@ -177,19 +189,19 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
         width={200}
         height={112}
       />
-      <HUD gameState={gameState} />
+      <HUD gameState={gameState} hasItem={hasItem} />
       <KillFeed />
       <DeathScreen visible={isDead} />
 
-      {/* In-game chat */}
       <InGameChat open={showChat} onClose={() => setShowChat(false)} />
 
-      {/* Mobile controls */}
       {isMobile && !isSpectating && (
         <MobileControls
           onJoystickInput={handleJoystick}
           onEmotePress={() => setShowEmoteWheel((p) => !p)}
           onChatPress={() => setShowChat((p) => !p)}
+          onUseItem={handleUseItem}
+          hasItem={hasItem}
         />
       )}
 

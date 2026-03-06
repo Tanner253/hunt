@@ -9,11 +9,22 @@ import {
   PlayerInput,
   GameOverData,
 } from '../shared/types';
+import { PLAYER_SPEED, LOBBY_TICK_RATE } from '../shared/constants';
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
 
 export function registerSocketHandlers(io: IO, lobbyManager: LobbyManager) {
+  const lobbyInterval = setInterval(() => {
+    const delta = 1 / LOBBY_TICK_RATE;
+    for (const [, lobby] of lobbyManager.lobbies) {
+      if (lobby.state !== 'waiting' && lobby.state !== 'countdown') continue;
+      if (lobby.players.size === 0) continue;
+      lobby.updateLobbyPositions(delta);
+      io.to(`lobby:${lobby.id}`).emit('lobby:positions', lobby.getLobbyPositions());
+    }
+  }, 1000 / LOBBY_TICK_RATE);
+
   io.on('connection', (socket: TypedSocket) => {
     console.log(`Connected: ${socket.id}`);
 
@@ -74,11 +85,38 @@ export function registerSocketHandlers(io: IO, lobbyManager: LobbyManager) {
       io.to(`lobby:${lobby.id}`).emit('lobby:chat', message);
     });
 
+    socket.on('lobby:move', (input: PlayerInput) => {
+      const lobby = lobbyManager.getPlayerLobby(socket.id);
+      const playerId = lobbyManager.getPlayerId(socket.id);
+      if (!lobby || !playerId) return;
+      const player = lobby.players.get(playerId);
+      if (!player) return;
+      let vx = 0, vy = 0;
+      if (input.up) vy = -PLAYER_SPEED;
+      if (input.down) vy = PLAYER_SPEED;
+      if (input.left) vx = -PLAYER_SPEED;
+      if (input.right) vx = PLAYER_SPEED;
+      if (vx !== 0 && vy !== 0) {
+        const len = Math.hypot(vx, vy);
+        vx = (vx / len) * PLAYER_SPEED;
+        vy = (vy / len) * PLAYER_SPEED;
+      }
+      player.lobbyVx = vx;
+      player.lobbyVy = vy;
+    });
+
     socket.on('game:input', (input: PlayerInput) => {
       const lobby = lobbyManager.getPlayerLobby(socket.id);
       const playerId = lobbyManager.getPlayerId(socket.id);
       if (!lobby?.game || !playerId) return;
       lobby.game.processInput(playerId, input);
+    });
+
+    socket.on('game:use-item', () => {
+      const lobby = lobbyManager.getPlayerLobby(socket.id);
+      const playerId = lobbyManager.getPlayerId(socket.id);
+      if (!lobby?.game || !playerId) return;
+      lobby.game.useItem(playerId);
     });
 
     socket.on('game:emote', (emoteId: string) => {
@@ -185,6 +223,9 @@ function startGame(io: IO, lm: LobbyManager, lobby: Lobby) {
     },
     onKill: (victimId: string, victimName: string, x: number, y: number) => {
       io.to(`lobby:${lobby.id}`).emit('game:kill', { victimId, victimName, x, y });
+    },
+    onMarked: (markerId: string, victimId: string, victimName: string) => {
+      io.to(`lobby:${lobby.id}`).emit('game:marked', { markerId, victimId, victimName });
     },
   };
 

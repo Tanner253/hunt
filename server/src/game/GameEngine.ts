@@ -1,6 +1,7 @@
+import { v4 as uuid } from 'uuid';
 import { GameMap } from './Map';
 import { ServerEntity, SeekerBot } from './Entity';
-import { GameState, PlayerInput, GameOverData, EmoteEvent } from '../shared/types';
+import { GameState, PlayerInput, GameOverData, EmoteEvent, PowerUpState } from '../shared/types';
 import {
   TICK_RATE,
   ROUND_TIME,
@@ -8,6 +9,10 @@ import {
   PLAYER_SPEED,
   PLAYER_RADIUS,
   SEEKER_BOOST_SPEED,
+  STINK_DURATION,
+  POWERUP_SPAWN_INTERVAL,
+  POWERUP_PICKUP_RADIUS,
+  POWERUP_MAX_ON_MAP,
   MAP_DEFAULT,
 } from '../shared/constants';
 
@@ -15,6 +20,13 @@ export interface GameEventCallbacks {
   onStateUpdate: (playerId: string, state: GameState) => void;
   onGameOver: (data: GameOverData) => void;
   onKill: (victimId: string, victimName: string, x: number, y: number) => void;
+  onMarked: (markerId: string, victimId: string, victimName: string) => void;
+}
+
+interface PowerUp {
+  id: string;
+  x: number;
+  y: number;
 }
 
 export class GameEngine {
@@ -30,6 +42,8 @@ export class GameEngine {
   startTime: number;
   deathOrder: { id: string; name: string; time: number }[] = [];
   emotes: EmoteEvent[] = [];
+  powerUps: PowerUp[] = [];
+  powerUpSpawnTimer = POWERUP_SPAWN_INTERVAL;
 
   constructor(
     id: string,
@@ -83,6 +97,17 @@ export class GameEngine {
     }, 3000);
   }
 
+  useItem(playerId: string) {
+    const player = this.players.get(playerId);
+    if (!player || player.isDead || !player.heldItem) return;
+    const hiders = Array.from(this.players.values());
+    const victim = player.useStinkBomb(hiders, this.map);
+    if (victim) {
+      victim.markedUntil = Date.now() + STINK_DURATION * 1000;
+      this.callbacks.onMarked(playerId, victim.id, victim.name);
+    }
+  }
+
   private updateTick() {
     const delta = 1 / TICK_RATE;
     this.tick++;
@@ -117,6 +142,7 @@ export class GameEngine {
 
     if (this.phase === 'hunting') {
       if (this.timer <= 0) this.seeker.speed = SEEKER_BOOST_SPEED;
+      this.updatePowerUps(delta);
       const hiders = Array.from(this.players.values());
       this.seeker.updateAI(delta, hiders, this.map);
       this.checkKills();
@@ -143,6 +169,27 @@ export class GameEngine {
     for (const [playerId] of this.players) {
       const state = this.getStateForPlayer(playerId);
       if (state) this.callbacks.onStateUpdate(playerId, state);
+    }
+  }
+
+  private updatePowerUps(delta: number) {
+    this.powerUpSpawnTimer -= delta;
+    if (this.powerUpSpawnTimer <= 0 && this.powerUps.length < POWERUP_MAX_ON_MAP) {
+      const pos = this.map.getRandomWalkablePos();
+      this.powerUps.push({ id: uuid(), x: pos.x, y: pos.y });
+      this.powerUpSpawnTimer = POWERUP_SPAWN_INTERVAL;
+    }
+
+    for (const [, entity] of this.players) {
+      if (entity.isDead || entity.heldItem) continue;
+      for (let i = this.powerUps.length - 1; i >= 0; i--) {
+        const pu = this.powerUps[i];
+        if (Math.hypot(entity.x - pu.x, entity.y - pu.y) < POWERUP_PICKUP_RADIUS) {
+          entity.heldItem = 'stink';
+          this.powerUps.splice(i, 1);
+          break;
+        }
+      }
     }
   }
 
@@ -203,6 +250,7 @@ export class GameEngine {
       phase: this.phase,
       entities,
       hidersAlive: this.getAliveHiders().length,
+      powerUps: this.powerUps.map((p) => ({ id: p.id, x: p.x, y: p.y })),
     };
   }
 

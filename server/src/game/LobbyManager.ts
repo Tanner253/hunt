@@ -1,11 +1,14 @@
 import { v4 as uuid } from 'uuid';
-import { LobbyInfo, LobbyPlayerInfo, ChatMessage } from '../shared/types';
+import { LobbyInfo, LobbyPlayerInfo, LobbyPositionState, ChatMessage } from '../shared/types';
 import {
   MAX_LOBBIES,
   MAX_PLAYERS_PER_LOBBY,
   FREE_LOBBY_MAX_PLAYERS,
   MIN_PLAYERS_TO_START,
   PLAYER_COLORS,
+  LOBBY_ARENA_W,
+  LOBBY_ARENA_H,
+  PLAYER_SPEED,
 } from '../shared/constants';
 import { GameEngine } from './GameEngine';
 
@@ -15,6 +18,11 @@ export interface LobbyPlayer {
   name: string;
   colorId: string;
   hasVoted: boolean;
+  lobbyX: number;
+  lobbyY: number;
+  lobbyVx: number;
+  lobbyVy: number;
+  lobbyFacingLeft: boolean;
 }
 
 export interface Spectator {
@@ -56,6 +64,11 @@ export class Lobby {
       name,
       colorId: this.getNextColor(),
       hasVoted: false,
+      lobbyX: 80 + Math.random() * (LOBBY_ARENA_W - 160),
+      lobbyY: 80 + Math.random() * (LOBBY_ARENA_H - 160),
+      lobbyVx: 0,
+      lobbyVy: 0,
+      lobbyFacingLeft: false,
     };
     this.players.set(player.id, player);
     return player;
@@ -92,6 +105,34 @@ export class Lobby {
     const voted = this.votes.size;
     if (count <= 3) return voted === count;
     return voted / count >= 0.75;
+  }
+
+  updateLobbyPositions(delta: number) {
+    if (this.state === 'playing') return;
+    const pad = 30;
+    for (const p of this.players.values()) {
+      const isMoving = Math.abs(p.lobbyVx) > 0.1 || Math.abs(p.lobbyVy) > 0.1;
+      if (isMoving) {
+        p.lobbyX += p.lobbyVx * delta;
+        p.lobbyY += p.lobbyVy * delta;
+        p.lobbyX = Math.max(pad, Math.min(LOBBY_ARENA_W - pad, p.lobbyX));
+        p.lobbyY = Math.max(pad, Math.min(LOBBY_ARENA_H - pad, p.lobbyY));
+        if (p.lobbyVx < -0.1) p.lobbyFacingLeft = true;
+        if (p.lobbyVx > 0.1) p.lobbyFacingLeft = false;
+      }
+    }
+  }
+
+  getLobbyPositions(): LobbyPositionState[] {
+    return Array.from(this.players.values()).map((p) => ({
+      id: p.id,
+      x: Math.round(p.lobbyX),
+      y: Math.round(p.lobbyY),
+      facingLeft: p.lobbyFacingLeft,
+      isMoving: Math.abs(p.lobbyVx) > 0.1 || Math.abs(p.lobbyVy) > 0.1,
+      colorId: p.colorId,
+      name: p.name,
+    }));
   }
 
   cancelCountdown() {

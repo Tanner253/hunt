@@ -4,6 +4,7 @@ import {
   PLAYER_SPEED,
   SEEKER_SPEED,
   SEEKER_VISION_RADIUS,
+  STINK_RANGE,
 } from '../shared/constants';
 import { EntityState, PlayerInput } from '../shared/types';
 import { GameMap, Wall } from './Map';
@@ -25,6 +26,8 @@ export class ServerEntity {
   deathTime = 0;
   walkCycle = 0;
   pendingInput: PlayerInput | null = null;
+  markedUntil = 0;
+  heldItem: 'stink' | null = null;
 
   constructor(id: string, x: number, y: number, colorId: string, role: 'seeker' | 'hider') {
     this.id = id;
@@ -33,6 +36,10 @@ export class ServerEntity {
     this.colorId = colorId;
     this.role = role;
     this.speed = role === 'seeker' ? SEEKER_SPEED : PLAYER_SPEED;
+  }
+
+  get isMarked(): boolean {
+    return this.markedUntil > Date.now();
   }
 
   update(delta: number, walls: Wall[]) {
@@ -67,6 +74,22 @@ export class ServerEntity {
     }
   }
 
+  useStinkBomb(allHiders: ServerEntity[], map: GameMap): ServerEntity | null {
+    if (this.heldItem !== 'stink' || this.isDead) return null;
+    this.heldItem = null;
+    let closest: ServerEntity | null = null;
+    let minDist = Infinity;
+    for (const other of allHiders) {
+      if (other.id === this.id || other.isDead) continue;
+      const d = Math.hypot(other.x - this.x, other.y - this.y);
+      if (d < STINK_RANGE && d < minDist && map.checkLineOfSight(this.x, this.y, other.x, other.y)) {
+        minDist = d;
+        closest = other;
+      }
+    }
+    return closest;
+  }
+
   serialize(visible = true): EntityState {
     return {
       id: this.id,
@@ -79,6 +102,8 @@ export class ServerEntity {
       role: this.role,
       name: this.name,
       visible,
+      isMarked: this.isMarked,
+      hasItem: this.heldItem !== null,
     };
   }
 }
@@ -101,13 +126,19 @@ export class SeekerBot extends ServerEntity {
     let closest: ServerEntity | null = null;
     let minDist = Infinity;
 
-    for (const hider of hiders) {
-      if (hider.isDead) continue;
-      const d = Math.hypot(hider.x - this.x, hider.y - this.y);
-      if (d < SEEKER_VISION_RADIUS && map.checkLineOfSight(this.x, this.y, hider.x, hider.y, SEEKER_VISION_RADIUS)) {
-        if (d < minDist) {
-          minDist = d;
-          closest = hider;
+    const markedTarget = hiders.find((h) => !h.isDead && h.isMarked);
+    if (markedTarget) {
+      closest = markedTarget;
+      minDist = Math.hypot(markedTarget.x - this.x, markedTarget.y - this.y);
+    } else {
+      for (const hider of hiders) {
+        if (hider.isDead) continue;
+        const d = Math.hypot(hider.x - this.x, hider.y - this.y);
+        if (d < SEEKER_VISION_RADIUS && map.checkLineOfSight(this.x, this.y, hider.x, hider.y, SEEKER_VISION_RADIUS)) {
+          if (d < minDist) {
+            minDist = d;
+            closest = hider;
+          }
         }
       }
     }

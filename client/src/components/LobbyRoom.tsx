@@ -4,6 +4,7 @@ import { getSocket } from '@/lib/socket';
 import { LobbyInfo } from '@/shared/types';
 import { COLORS } from '@/shared/constants';
 import { ChatPanel } from './ChatPanel';
+import { LobbyPlayground } from './LobbyPlayground';
 
 interface LobbyRoomProps {
   lobby: LobbyInfo;
@@ -117,6 +118,7 @@ export function LobbyRoom({ lobby, playerId, onLeave, countdown }: LobbyRoomProp
         )}
       </div>
 
+      <LobbyPlayground playerId={playerId} />
       <ChatPanel lobbyId={lobby.id} />
     </div>
   );

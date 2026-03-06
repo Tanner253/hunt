@@ -9,6 +9,14 @@ export interface EntityState {
   role: 'seeker' | 'hider';
   name: string;
   visible: boolean;
+  isMarked: boolean;
+  hasItem: boolean;
+}
+
+export interface PowerUpState {
+  id: string;
+  x: number;
+  y: number;
 }
 
 export interface GameState {
@@ -17,6 +25,17 @@ export interface GameState {
   phase: 'hiding' | 'hunting' | 'over';
   entities: EntityState[];
   hidersAlive: number;
+  powerUps: PowerUpState[];
+}
+
+export interface LobbyPositionState {
+  id: string;
+  x: number;
+  y: number;
+  facingLeft: boolean;
+  isMoving: boolean;
+  colorId: string;
+  name: string;
 }
 
 export interface PlayerInput {
@@ -71,11 +90,13 @@ export interface ServerToClientEvents {
   'lobby:state': (lobby: LobbyInfo) => void;
   'lobby:chat': (message: ChatMessage) => void;
   'lobby:countdown': (seconds: number) => void;
+  'lobby:positions': (positions: LobbyPositionState[]) => void;
   'game:state': (state: GameState) => void;
   'game:start': (data: { mapId: string; yourId: string; colorId: string }) => void;
   'game:over': (data: GameOverData) => void;
   'game:kill': (data: { victimId: string; victimName: string; x: number; y: number }) => void;
   'game:emote': (data: EmoteEvent) => void;
+  'game:marked': (data: { markerId: string; victimId: string; victimName: string }) => void;
   'error': (message: string) => void;
 }
 
@@ -88,7 +109,9 @@ export interface ClientToServerEvents {
   'lobby:leave': () => void;
   'lobby:vote-start': () => void;
   'lobby:chat': (text: string) => void;
+  'lobby:move': (input: PlayerInput) => void;
   'game:input': (input: PlayerInput) => void;
+  'game:use-item': () => void;
   'game:emote': (emoteId: string) => void;
   'spectate:join': (lobbyId: string) => void;
   'spectate:switch': (direction: 'next' | 'prev') => void;
