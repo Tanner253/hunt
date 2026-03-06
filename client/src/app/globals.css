@@ -11,6 +11,13 @@ body {
   box-sizing: border-box;
 }
 
+canvas {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 @keyframes float-up {
   0% { transform: translateY(100vh) scale(0); opacity: 0; }
   10% { opacity: 0.6; }

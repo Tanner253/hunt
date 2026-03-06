@@ -5,10 +5,13 @@ import { getSocket } from '@/lib/socket';
 import { drawGame, initMapRendering } from '@/lib/renderer';
 import { GameState, EntityState, PlayerInput, GameOverData } from '@/shared/types';
 import { MAP_DEFAULT, TICK_RATE } from '@/shared/constants';
+import { useMobile } from '@/lib/useMobile';
 import { HUD } from './HUD';
 import { EmoteWheel } from './EmoteWheel';
 import { KillFeed } from './KillFeed';
 import { DeathScreen } from './DeathScreen';
+import { MobileControls } from './MobileControls';
+import { InGameChat } from './InGameChat';
 
 interface Props {
   playerId: string;
@@ -23,12 +26,18 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
     current: null, previous: null, lastUpdate: 0,
   });
   const keysRef = useRef<Record<string, boolean>>({});
+  const joystickRef = useRef({ dx: 0, dy: 0 });
   const bloodRef = useRef<{ x: number; y: number; r: number }[]>([]);
   const cameraRef = useRef({ x: 0, y: 0 });
   const emotesRef = useRef<Map<string, string>>(new Map());
   const [showEmoteWheel, setShowEmoteWheel] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [isDead, setIsDead] = useState(false);
+  const isMobile = useMobile();
+  const chatOpenRef = useRef(false);
+
+  useEffect(() => { chatOpenRef.current = showChat; }, [showChat]);
 
   useEffect(() => {
     initMapRendering(MAP_DEFAULT);
@@ -72,10 +81,17 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      if (chatOpenRef.current) return;
       keysRef.current[e.code] = true;
       if (e.code === 'KeyE') setShowEmoteWheel((p) => !p);
+      if (e.code === 'KeyT') {
+        e.preventDefault();
+        setShowChat(true);
+      }
     };
-    const up = (e: KeyboardEvent) => { keysRef.current[e.code] = false; };
+    const up = (e: KeyboardEvent) => {
+      keysRef.current[e.code] = false;
+    };
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
@@ -86,11 +102,13 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
     const socket = getSocket();
     const interval = setInterval(() => {
       const k = keysRef.current;
+      const j = joystickRef.current;
+      const hasJoystick = Math.abs(j.dx) > 0.01 || Math.abs(j.dy) > 0.01;
       const input: PlayerInput = {
-        up: !!(k['KeyW'] || k['ArrowUp']),
-        down: !!(k['KeyS'] || k['ArrowDown']),
-        left: !!(k['KeyA'] || k['ArrowLeft']),
-        right: !!(k['KeyD'] || k['ArrowRight']),
+        up: hasJoystick ? j.dy < -0.3 : !!(k['KeyW'] || k['ArrowUp']),
+        down: hasJoystick ? j.dy > 0.3 : !!(k['KeyS'] || k['ArrowDown']),
+        left: hasJoystick ? j.dx < -0.3 : !!(k['KeyA'] || k['ArrowLeft']),
+        right: hasJoystick ? j.dx > 0.3 : !!(k['KeyD'] || k['ArrowRight']),
         seq: Date.now(),
       };
       socket.emit('game:input', input);
@@ -146,6 +164,10 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
     setShowEmoteWheel(false);
   }, []);
 
+  const handleJoystick = useCallback((dx: number, dy: number) => {
+    joystickRef.current = { dx, dy };
+  }, []);
+
   return (
     <div className="relative w-screen h-screen overflow-hidden">
       <canvas ref={canvasRef} className="block" />
@@ -158,6 +180,18 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
       <HUD gameState={gameState} />
       <KillFeed />
       <DeathScreen visible={isDead} />
+
+      {/* In-game chat */}
+      <InGameChat open={showChat} onClose={() => setShowChat(false)} />
+
+      {/* Mobile controls */}
+      {isMobile && !isSpectating && (
+        <MobileControls
+          onJoystickInput={handleJoystick}
+          onEmotePress={() => setShowEmoteWheel((p) => !p)}
+          onChatPress={() => setShowChat((p) => !p)}
+        />
+      )}
 
       {isSpectating && (
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur px-8 py-3 rounded-2xl border border-gray-700/50 flex items-center gap-6 z-20">

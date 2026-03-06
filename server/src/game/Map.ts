@@ -23,6 +23,7 @@ interface PathNode {
 
 export class GameMap {
   grid: number[][] = [];
+  reachable: boolean[][] = [];
   walls: Wall[] = [];
   shadowSegments: Segment[] = [];
   cols: number;
@@ -36,6 +37,7 @@ export class GameMap {
     this.mapWidth = this.cols * TILE_SIZE;
     this.mapHeight = this.rows * TILE_SIZE;
     this.parse(mapGrid);
+    this.computeReachable();
   }
 
   private parse(mapGrid: string[]) {
@@ -136,6 +138,44 @@ export class GameMap {
     }
   }
 
+  private computeReachable() {
+    this.reachable = Array(this.rows).fill(0).map(() => Array(this.cols).fill(false));
+
+    const regions: { x: number; y: number }[][] = [];
+    const visited: boolean[][] = Array(this.rows).fill(0).map(() => Array(this.cols).fill(false));
+    const dirs = [{ x: 0, y: -1 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }];
+
+    for (let y = 0; y < this.rows; y++) {
+      for (let x = 0; x < this.cols; x++) {
+        if (this.grid[y][x] === 1 || visited[y][x]) continue;
+        const region: { x: number; y: number }[] = [];
+        const stack = [{ x, y }];
+        visited[y][x] = true;
+        while (stack.length > 0) {
+          const cell = stack.pop()!;
+          region.push(cell);
+          for (const d of dirs) {
+            const nx = cell.x + d.x;
+            const ny = cell.y + d.y;
+            if (nx < 0 || nx >= this.cols || ny < 0 || ny >= this.rows) continue;
+            if (this.grid[ny][nx] === 1 || visited[ny][nx]) continue;
+            visited[ny][nx] = true;
+            stack.push({ x: nx, y: ny });
+          }
+        }
+        regions.push(region);
+      }
+    }
+
+    let largest = regions[0] || [];
+    for (const r of regions) {
+      if (r.length > largest.length) largest = r;
+    }
+    for (const cell of largest) {
+      this.reachable[cell.y][cell.x] = true;
+    }
+  }
+
   checkLineOfSight(x1: number, y1: number, x2: number, y2: number, maxRange?: number): boolean {
     const range = maxRange ?? VISION_RADIUS;
     if (Math.hypot(x2 - x1, y2 - y1) > range) return false;
@@ -172,7 +212,7 @@ export class GameMap {
 
     if (sx < 0 || sx >= this.cols || sy < 0 || sy >= this.rows) return null;
     if (ex < 0 || ex >= this.cols || ey < 0 || ey >= this.rows) return null;
-    if (this.grid[ey][ex] === 1) return null;
+    if (!this.reachable[ey][ex] || !this.reachable[sy][sx]) return null;
 
     const openList: PathNode[] = [];
     const closed = new Set<string>();
@@ -233,7 +273,7 @@ export class GameMap {
     do {
       x = Math.floor(Math.random() * this.cols);
       y = Math.floor(Math.random() * this.rows);
-    } while (this.grid[y][x] === 1);
+    } while (!this.reachable[y][x]);
     return { x: x * TILE_SIZE + TILE_SIZE / 2, y: y * TILE_SIZE + TILE_SIZE / 2 };
   }
 }
