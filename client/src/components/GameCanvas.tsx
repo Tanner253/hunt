@@ -312,8 +312,11 @@ export function GameCanvas({ playerId, mapId, isSpectating, onGameOver }: Props)
   const isBoosted = me?.isBoosted || false;
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden">
-      <canvas ref={canvasRef} className="block" />
+    <div
+      className="relative w-screen h-screen overflow-hidden touch-none"
+      onTouchMove={(e) => e.preventDefault()}
+    >
+      <canvas ref={canvasRef} className="block touch-none" />
       <canvas
         ref={minimapRef}
         className="absolute top-4 left-4 rounded-xl border border-gray-700 shadow-lg bg-gray-900/80 z-10"
@@ -325,12 +328,12 @@ export function GameCanvas({ playerId, mapId, isSpectating, onGameOver }: Props)
       <DeathScreen visible={isDead} />
 
       {isDead && spectateName && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur px-8 py-3 rounded-2xl border border-gray-700/50 flex items-center gap-6 z-20">
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur px-6 sm:px-8 py-3 rounded-2xl border border-gray-700/50 flex items-center gap-4 sm:gap-6 z-20">
           <button
             onClick={() => cycleSpectateTarget(-1)}
-            className="text-white font-bold hover:text-blue-400 transition-colors text-lg"
+            className="text-white font-bold hover:text-blue-400 active:text-blue-400 transition-colors text-lg p-2"
           >
-            <kbd className="bg-gray-800 px-2 py-0.5 rounded text-xs mr-1 border border-gray-700">Q</kbd>
+            {!isMobile && <kbd className="bg-gray-800 px-2 py-0.5 rounded text-xs mr-1 border border-gray-700">Q</kbd>}
             &#8592;
           </button>
           <div className="text-center">
@@ -339,10 +342,10 @@ export function GameCanvas({ playerId, mapId, isSpectating, onGameOver }: Props)
           </div>
           <button
             onClick={() => cycleSpectateTarget(1)}
-            className="text-white font-bold hover:text-blue-400 transition-colors text-lg"
+            className="text-white font-bold hover:text-blue-400 active:text-blue-400 transition-colors text-lg p-2"
           >
             &#8594;
-            <kbd className="bg-gray-800 px-2 py-0.5 rounded text-xs ml-1 border border-gray-700">E</kbd>
+            {!isMobile && <kbd className="bg-gray-800 px-2 py-0.5 rounded text-xs ml-1 border border-gray-700">E</kbd>}
           </button>
         </div>
       )}
@@ -359,7 +362,7 @@ export function GameCanvas({ playerId, mapId, isSpectating, onGameOver }: Props)
 
       <InGameChat open={showChat} onClose={() => setShowChat(false)} />
 
-      {isMobile && !isSpectating && (
+      {isMobile && !isSpectating && !isDead && (
         <MobileControls
           onJoystickInput={handleJoystick}
           onEmotePress={() => setShowEmoteWheel((p) => !p)}
@@ -370,10 +373,10 @@ export function GameCanvas({ playerId, mapId, isSpectating, onGameOver }: Props)
       )}
 
       {isSpectating && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur px-8 py-3 rounded-2xl border border-gray-700/50 flex items-center gap-6 z-20">
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur px-6 sm:px-8 py-3 rounded-2xl border border-gray-700/50 flex items-center gap-4 sm:gap-6 z-20">
           <button
             onClick={() => getSocket().emit('spectate:switch', 'prev')}
-            className="text-white font-bold hover:text-blue-400 transition-colors text-lg"
+            className="text-white font-bold hover:text-blue-400 active:text-blue-400 transition-colors text-lg p-2"
           >
             &#8592; Prev
           </button>
@@ -382,7 +385,7 @@ export function GameCanvas({ playerId, mapId, isSpectating, onGameOver }: Props)
           </div>
           <button
             onClick={() => getSocket().emit('spectate:switch', 'next')}
-            className="text-white font-bold hover:text-blue-400 transition-colors text-lg"
+            className="text-white font-bold hover:text-blue-400 active:text-blue-400 transition-colors text-lg p-2"
           >
             Next &#8594;
           </button>

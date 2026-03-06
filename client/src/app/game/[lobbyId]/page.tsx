@@ -116,7 +116,7 @@ export default function GamePage() {
 
   if (pageState === 'lobby' || pageState === 'countdown') {
     return (
-      <div className="min-h-screen bg-gray-950 p-6 relative">
+      <div className="min-h-screen bg-gray-950 p-3 sm:p-6 relative">
         <div className="fixed top-3 right-4 z-40">
           <CopyCA />
         </div>

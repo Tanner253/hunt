@@ -36,22 +36,22 @@ export function WelcomePopup() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={dismiss}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4" onClick={dismiss}>
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
 
       {/* Modal */}
       <div
-        className="relative w-full max-w-2xl max-h-[90vh] bg-gray-950 border border-gray-800 rounded-3xl shadow-2xl shadow-purple-900/20 overflow-hidden animate-scale-in flex flex-col"
+        className="relative w-full max-w-2xl max-h-[92vh] bg-gray-950 border border-gray-800 rounded-2xl sm:rounded-3xl shadow-2xl shadow-purple-900/20 overflow-hidden animate-scale-in flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Gradient top bar */}
         <div className="h-1.5 w-full bg-gradient-to-r from-[#00FFA3] via-[#03E1FF] to-[#DC1FFF]" />
 
-        <div className="px-8 py-8 overflow-y-auto">
+        <div className="px-4 py-6 sm:px-8 sm:py-8 overflow-y-auto">
           {/* Ticker */}
           <div className="text-center mb-6">
-            <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-1">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight mb-1">
               <span
                 className="inline-block"
                 style={{

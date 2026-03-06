@@ -147,7 +147,7 @@ function MapVoteSection({ lobby, playerId }: { lobby: LobbyInfo; playerId: strin
   return (
     <div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-5">
       <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-4">Vote for Map</h3>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {lobby.mapCandidates.map((candidate) => {
           const mapDef = getMapById(candidate.id);
           const votes = voteCounts[candidate.id] || 0;
@@ -156,7 +156,7 @@ function MapVoteSection({ lobby, playerId }: { lobby: LobbyInfo; playerId: strin
             <button
               key={candidate.id}
               onClick={() => handleVote(candidate.id)}
-              className={`flex flex-col items-center gap-2 rounded-xl p-3 transition-all ${
+              className={`flex flex-col items-center gap-2 rounded-xl p-3 transition-all active:scale-[0.97] ${
                 isSelected
                   ? 'bg-blue-900/40 border-2 border-blue-500 shadow-[0_0_16px_rgba(59,130,246,0.25)]'
                   : 'bg-gray-800/40 border-2 border-transparent hover:border-gray-600 hover:bg-gray-800/60'

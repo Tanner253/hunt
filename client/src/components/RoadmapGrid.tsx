@@ -58,7 +58,7 @@ export const ROADMAP_PHASES = [
 export function RoadmapGrid({ compact = false }: { compact?: boolean }) {
   return (
     <>
-      <div className={`grid ${compact ? 'grid-cols-2' : 'sm:grid-cols-2'} gap-3`}>
+      <div className={`grid ${compact ? 'grid-cols-1 sm:grid-cols-2' : 'sm:grid-cols-2'} gap-3`}>
         {ROADMAP_PHASES.map((phase, idx) => (
           <div
             key={phase.phase}
