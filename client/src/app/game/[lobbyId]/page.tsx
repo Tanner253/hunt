@@ -3,10 +3,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getSocket } from '@/lib/socket';
+import { gameAudio } from '@/lib/audio';
 import { LobbyInfo, GameOverData } from '@/shared/types';
 import { LobbyRoom } from '@/components/LobbyRoom';
 import { GameCanvas } from '@/components/GameCanvas';
 import { CountdownOverlay } from '@/components/CountdownOverlay';
+import { AudioToggle } from '@/components/AudioToggle';
 
 type PageState = 'joining' | 'lobby' | 'countdown' | 'playing' | 'spectating' | 'gameover';
 
@@ -32,12 +34,15 @@ export default function GamePage() {
     const socket = getSocket();
     if (!socket.connected) socket.connect();
 
+    gameAudio.init();
+
     socket.emit('lobby:join', { lobbyId, playerName }, (result) => {
       if (result.success && result.lobby) {
         setLobby(result.lobby);
         const me = result.lobby.players[result.lobby.players.length - 1];
         setPlayerId(me.id);
         setPageState('lobby');
+        gameAudio.playLobbyMusic();
       } else {
         socket.emit('spectate:join', lobbyId);
         setPageState('spectating');
@@ -49,20 +54,31 @@ export default function GamePage() {
       if (lobbyInfo.state === 'waiting' && pageStateRef.current === 'gameover') {
         setGameOverData(null);
         setPageState('lobby');
+        gameAudio.playLobbyMusic();
       }
     };
 
     socket.on('lobby:state', handleLobbyState);
-    socket.on('lobby:countdown', (s) => { setCountdown(s); setPageState('countdown'); });
+    socket.on('lobby:countdown', (s) => {
+      setCountdown(s);
+      setPageState('countdown');
+      gameAudio.playCountdownBeep(s <= 1);
+    });
     socket.on('game:start', (data) => {
       setPlayerId(data.yourId);
       setCountdown(0);
+      gameAudio.stopMusic();
+      gameAudio.playGameStart();
       setTimeout(() => {
         setPageState('playing');
         setCountdown(null);
       }, 800);
     });
-    socket.on('game:over', (data) => { setGameOverData(data); setPageState('gameover'); });
+    socket.on('game:over', (data) => {
+      setGameOverData(data);
+      setPageState('gameover');
+      gameAudio.stopMusic();
+    });
     socket.on('error', (msg) => console.error('Socket error:', msg));
 
     return () => {
@@ -102,17 +118,21 @@ export default function GamePage() {
           <LobbyRoom lobby={lobby} playerId={playerId} onLeave={handleLeave} countdown={countdown} />
         )}
         <CountdownOverlay count={countdown} />
+        <AudioToggle />
       </div>
     );
   }
 
   if ((pageState === 'playing' || pageState === 'spectating') && playerId) {
     return (
-      <GameCanvas
-        playerId={playerId}
-        isSpectating={pageState === 'spectating'}
-        onGameOver={handleGameOver}
-      />
+      <>
+        <GameCanvas
+          playerId={playerId}
+          isSpectating={pageState === 'spectating'}
+          onGameOver={handleGameOver}
+        />
+        <AudioToggle />
+      </>
     );
   }
 
@@ -148,6 +168,11 @@ function GameOverScreen({
   const isWinner = data.winnerId === playerId;
   const [visible, setVisible] = useState(false);
   const [returnTimer, setReturnTimer] = useState(10);
+
+  useEffect(() => {
+    if (isWinner) gameAudio.playVictory();
+    else gameAudio.playDeath();
+  }, [isWinner]);
 
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true));

@@ -6,6 +6,7 @@ import { drawGame, initMapRendering } from '@/lib/renderer';
 import { GameState, EntityState, PlayerInput, GameOverData } from '@/shared/types';
 import { MAP_DEFAULT, TICK_RATE } from '@/shared/constants';
 import { useMobile } from '@/lib/useMobile';
+import { gameAudio } from '@/lib/audio';
 import { HUD } from './HUD';
 import { EmoteWheel } from './EmoteWheel';
 import { KillFeed } from './KillFeed';
@@ -30,6 +31,9 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
   const bloodRef = useRef<{ x: number; y: number; r: number }[]>([]);
   const cameraRef = useRef({ x: 0, y: 0 });
   const emotesRef = useRef<Map<string, string>>(new Map());
+  const lastPhaseRef = useRef<string>('');
+  const lastHasItemRef = useRef(false);
+  const footstepTimer = useRef(0);
   const [showEmoteWheel, setShowEmoteWheel] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -41,6 +45,7 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
 
   useEffect(() => {
     initMapRendering(MAP_DEFAULT);
+    gameAudio.init();
     const socket = getSocket();
 
     const onState = (state: GameState) => {
@@ -50,7 +55,35 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
       setGameState(state);
 
       const me = state.entities.find((e) => e.id === playerId);
-      if (me?.isDead && !isDead) setIsDead(true);
+      if (me?.isDead && !isDead) {
+        setIsDead(true);
+        gameAudio.playDeath();
+      }
+
+      // Switch music based on game phase
+      const phaseKey = state.phase === 'hunting'
+        ? (state.timer <= 0 ? 'overtime' : 'hunting')
+        : state.phase;
+      if (phaseKey !== lastPhaseRef.current && state.phase !== 'over') {
+        lastPhaseRef.current = phaseKey;
+        if (phaseKey === 'hiding') gameAudio.playTrack('hiding');
+        else if (phaseKey === 'hunting') gameAudio.playTrack('hunting');
+        else if (phaseKey === 'overtime') gameAudio.playTrack('overtime');
+      }
+
+      // Detect seeker proximity for chase music overlay
+      if (me && !me.isDead && state.phase === 'hunting') {
+        const seeker = state.entities.find((e) => e.role === 'seeker' && e.visible);
+        if (seeker) {
+          const dist = Math.hypot(seeker.x - me.x, seeker.y - me.y);
+          if (dist < 400) gameAudio.playTrack('chase');
+          else if (lastPhaseRef.current !== 'overtime') gameAudio.playTrack(state.timer <= 0 ? 'overtime' : 'hunting');
+        }
+      }
+
+      // Power-up pickup detection
+      if (me?.hasItem && !lastHasItemRef.current) gameAudio.playPowerUp();
+      lastHasItemRef.current = me?.hasItem || false;
     };
     const onKill = (data: { victimId: string; x: number; y: number }) => {
       for (let i = 0; i < 5; i++) {
@@ -60,22 +93,28 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
           r: 5 + Math.random() * 10,
         });
       }
+      gameAudio.playDeath();
     };
     const onEmote = (data: { playerId: string; emoteId: string }) => {
       emotesRef.current.set(data.playerId, data.emoteId);
       setTimeout(() => emotesRef.current.delete(data.playerId), 3000);
+      gameAudio.playEmote();
     };
+    const onMarked = () => { gameAudio.playMarked(); };
 
     socket.on('game:state', onState);
     socket.on('game:kill', onKill);
     socket.on('game:emote', onEmote);
     socket.on('game:over', onGameOver);
+    socket.on('game:marked', onMarked);
 
     return () => {
       socket.off('game:state', onState);
       socket.off('game:kill', onKill);
       socket.off('game:emote', onEmote);
       socket.off('game:over', onGameOver);
+      socket.off('game:marked', onMarked);
+      gameAudio.stopMusic();
     };
   }, [onGameOver, playerId, isDead]);
 
@@ -92,6 +131,7 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
       if (e.code === 'Space') {
         e.preventDefault();
         getSocket().emit('game:use-item');
+        gameAudio.playStinkBomb();
       }
     };
     const up = (e: KeyboardEvent) => {
@@ -148,6 +188,12 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
         if (me) {
           cameraRef.current.x += (me.x - canvas.width / 2 - cameraRef.current.x) * 0.1;
           cameraRef.current.y += (me.y - canvas.height / 2 - cameraRef.current.y) * 0.1;
+
+          const now = performance.now();
+          if (me.isMoving && !me.isDead && now - footstepTimer.current > 220) {
+            footstepTimer.current = now;
+            gameAudio.playFootstep();
+          }
         }
         drawGame(
           ctx, shadowCanvas, shadowCtx,
@@ -176,6 +222,7 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
 
   const handleUseItem = useCallback(() => {
     getSocket().emit('game:use-item');
+    gameAudio.playStinkBomb();
   }, []);
 
   const me = gameState?.entities.find((e) => e.id === playerId);

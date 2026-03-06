@@ -5,6 +5,7 @@ import { getSocket } from '@/lib/socket';
 import { LobbyArenaState, PlayerInput } from '@/shared/types';
 import { COLORS, LOBBY_ARENA_W, LOBBY_ARENA_H } from '@/shared/constants';
 import { useMobile } from '@/lib/useMobile';
+import { gameAudio } from '@/lib/audio';
 
 interface LobbyPlaygroundProps {
   playerId: string;
@@ -14,16 +15,22 @@ export function LobbyPlayground({ playerId }: LobbyPlaygroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const arenaRef = useRef<LobbyArenaState>({ players: [], coins: [] });
   const keysRef = useRef<Record<string, boolean>>({});
+  const lastScoreRef = useRef(0);
   const isMobile = useMobile();
 
   useEffect(() => {
     const socket = getSocket();
     const handler = (state: LobbyArenaState) => {
+      const me = state.players.find((p) => p.id === playerId);
+      if (me && me.score > lastScoreRef.current) {
+        gameAudio.playCoinCollect();
+      }
+      lastScoreRef.current = me?.score || 0;
       arenaRef.current = state;
     };
     socket.on('lobby:positions', handler);
     return () => { socket.off('lobby:positions', handler); };
-  }, []);
+  }, [playerId]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
