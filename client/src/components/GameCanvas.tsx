@@ -28,7 +28,6 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
   const emotesRef = useRef<Map<string, string>>(new Map());
   const [showEmoteWheel, setShowEmoteWheel] = useState(false);
   const [gameState, setGameState] = useState<GameState | null>(null);
-  const [entities, setEntities] = useState<EntityState[]>([]);
   const [isDead, setIsDead] = useState(false);
 
   useEffect(() => {
@@ -40,7 +39,6 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
       stateRef.current.current = state;
       stateRef.current.lastUpdate = performance.now();
       setGameState(state);
-      setEntities(state.entities);
 
       const me = state.entities.find((e) => e.id === playerId);
       if (me?.isDead && !isDead) setIsDead(true);
@@ -158,7 +156,7 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
         height={112}
       />
       <HUD gameState={gameState} />
-      <KillFeed entities={entities} />
+      <KillFeed />
       <DeathScreen visible={isDead} />
 
       {isSpectating && (

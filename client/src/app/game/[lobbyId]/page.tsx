@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getSocket } from '@/lib/socket';
 import { LobbyInfo, GameOverData } from '@/shared/types';
@@ -20,10 +20,13 @@ export default function GamePage() {
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [gameOverData, setGameOverData] = useState<GameOverData | null>(null);
+  const pageStateRef = useRef<PageState>('joining');
   const [playerName] = useState(() => {
     if (typeof window !== 'undefined') return localStorage.getItem('hunt-player-name') || 'Player';
     return 'Player';
   });
+
+  useEffect(() => { pageStateRef.current = pageState; }, [pageState]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -41,7 +44,15 @@ export default function GamePage() {
       }
     });
 
-    socket.on('lobby:state', setLobby);
+    const handleLobbyState = (lobbyInfo: LobbyInfo) => {
+      setLobby(lobbyInfo);
+      if (lobbyInfo.state === 'waiting' && pageStateRef.current === 'gameover') {
+        setGameOverData(null);
+        setPageState('lobby');
+      }
+    };
+
+    socket.on('lobby:state', handleLobbyState);
     socket.on('lobby:countdown', (s) => { setCountdown(s); setPageState('countdown'); });
     socket.on('game:start', (data) => {
       setPlayerId(data.yourId);
@@ -55,7 +66,7 @@ export default function GamePage() {
     socket.on('error', (msg) => console.error('Socket error:', msg));
 
     return () => {
-      socket.off('lobby:state');
+      socket.off('lobby:state', handleLobbyState);
       socket.off('lobby:countdown');
       socket.off('game:start');
       socket.off('game:over');
@@ -106,7 +117,14 @@ export default function GamePage() {
   }
 
   if (pageState === 'gameover' && gameOverData) {
-    return <GameOverScreen data={gameOverData} playerId={playerId} onBackToLobby={() => { setGameOverData(null); setPageState('lobby'); }} onHome={() => router.push('/')} />;
+    return (
+      <GameOverScreen
+        data={gameOverData}
+        playerId={playerId}
+        onBackToLobby={() => { setGameOverData(null); setPageState('lobby'); }}
+        onHome={() => router.push('/')}
+      />
+    );
   }
 
   return (
@@ -129,9 +147,17 @@ function GameOverScreen({
 }) {
   const isWinner = data.winnerId === playerId;
   const [visible, setVisible] = useState(false);
+  const [returnTimer, setReturnTimer] = useState(10);
 
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true));
+    const interval = setInterval(() => {
+      setReturnTimer((t) => {
+        if (t <= 1) { clearInterval(interval); return 0; }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const medals = ['\u{1F947}', '\u{1F948}', '\u{1F949}'];
@@ -172,10 +198,7 @@ function GameOverScreen({
           <>
             <h1
               className="text-6xl md:text-8xl font-black tracking-tighter"
-              style={{
-                color: '#C51111',
-                textShadow: '0 0 40px rgba(197,17,17,0.3)',
-              }}
+              style={{ color: '#C51111', textShadow: '0 0 40px rgba(197,17,17,0.3)' }}
             >
               GAME OVER
             </h1>
@@ -191,8 +214,11 @@ function GameOverScreen({
       {/* Standings */}
       <div className="relative z-10 w-full max-w-lg animate-scale-in" style={{ animationDelay: '0.2s' }}>
         <div className="bg-gray-900/80 border border-gray-800 rounded-2xl overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-800">
+          <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center">
             <h3 className="text-white font-bold text-sm uppercase tracking-wider">Final Standings</h3>
+            <span className="text-gray-600 text-xs font-mono">
+              {data.duration.toFixed(0)}s match
+            </span>
           </div>
           <div className="divide-y divide-gray-800/50">
             {data.standings.map((s, i) => {
@@ -225,19 +251,26 @@ function GameOverScreen({
       </div>
 
       {/* Actions */}
-      <div className="relative z-10 flex gap-4 animate-scale-in" style={{ animationDelay: '0.4s' }}>
-        <button
-          onClick={onBackToLobby}
-          className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-8 py-3.5 rounded-2xl transition-all hover:shadow-[0_0_30px_rgba(37,99,235,0.3)] active:scale-95"
-        >
-          PLAY AGAIN
-        </button>
-        <button
-          onClick={onHome}
-          className="bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold px-8 py-3.5 rounded-2xl transition-colors active:scale-95"
-        >
-          HOME
-        </button>
+      <div className="relative z-10 flex flex-col items-center gap-3 animate-scale-in" style={{ animationDelay: '0.4s' }}>
+        <div className="flex gap-4">
+          <button
+            onClick={onBackToLobby}
+            className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-8 py-3.5 rounded-2xl transition-all hover:shadow-[0_0_30px_rgba(37,99,235,0.3)] active:scale-95"
+          >
+            PLAY AGAIN
+          </button>
+          <button
+            onClick={onHome}
+            className="bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold px-8 py-3.5 rounded-2xl transition-colors active:scale-95"
+          >
+            HOME
+          </button>
+        </div>
+        {returnTimer > 0 && (
+          <p className="text-gray-600 text-sm">
+            Returning to lobby in {returnTimer}s
+          </p>
+        )}
       </div>
     </div>
   );

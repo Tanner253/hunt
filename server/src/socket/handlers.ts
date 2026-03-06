@@ -181,10 +181,10 @@ function startGame(io: IO, lm: LobbyManager, lobby: Lobby) {
         lm.resetLobby(lobby.id);
         io.to(`lobby:${lobby.id}`).emit('lobby:state', lobby.getInfo());
         broadcastLobbyList(io, lm);
-      }, 5000);
+      }, 10000);
     },
-    onKill: (victimId: string, x: number, y: number) => {
-      io.to(`lobby:${lobby.id}`).emit('game:kill', { victimId, x, y });
+    onKill: (victimId: string, victimName: string, x: number, y: number) => {
+      io.to(`lobby:${lobby.id}`).emit('game:kill', { victimId, victimName, x, y });
     },
   };
 

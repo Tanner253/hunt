@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { getSocket } from '@/lib/socket';
-import { EntityState } from '@/shared/types';
 
 interface KillEntry {
   id: string;
@@ -11,21 +10,15 @@ interface KillEntry {
   leaving: boolean;
 }
 
-interface KillFeedProps {
-  entities: EntityState[];
-}
-
-export function KillFeed({ entities }: KillFeedProps) {
+export function KillFeed() {
   const [kills, setKills] = useState<KillEntry[]>([]);
 
   useEffect(() => {
     const socket = getSocket();
-    const handler = (data: { victimId: string }) => {
-      const victim = entities.find((e) => e.id === data.victimId);
-      const name = victim?.name || 'Unknown';
+    const handler = (data: { victimId: string; victimName: string }) => {
       const entry: KillEntry = {
         id: `${data.victimId}-${Date.now()}`,
-        victimName: name,
+        victimName: data.victimName,
         timestamp: Date.now(),
         leaving: false,
       };
@@ -40,7 +33,7 @@ export function KillFeed({ entities }: KillFeedProps) {
     };
     socket.on('game:kill', handler);
     return () => { socket.off('game:kill', handler); };
-  }, [entities]);
+  }, []);
 
   if (kills.length === 0) return null;
 

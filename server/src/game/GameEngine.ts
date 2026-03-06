@@ -14,7 +14,7 @@ import {
 export interface GameEventCallbacks {
   onStateUpdate: (playerId: string, state: GameState) => void;
   onGameOver: (data: GameOverData) => void;
-  onKill: (victimId: string, x: number, y: number) => void;
+  onKill: (victimId: string, victimName: string, x: number, y: number) => void;
 }
 
 export class GameEngine {
@@ -158,7 +158,7 @@ export class GameEngine {
           name: entity.name,
           time: (Date.now() - this.startTime) / 1000,
         });
-        this.callbacks.onKill(entity.id, entity.x, entity.y);
+        this.callbacks.onKill(entity.id, entity.name, entity.x, entity.y);
       }
     }
   }

@@ -54,6 +54,12 @@ export function HUD({ gameState }: HUDProps) {
           Find a hiding spot!
         </div>
       )}
+      {gameState.phase === 'hunting' && gameState.timer <= 0 && (
+        <div className="bg-red-500/20 backdrop-blur-md text-red-400 px-4 py-2 rounded-xl border border-red-500/30 text-sm font-black animate-pulse flex items-center gap-2">
+          <span className="text-base">{'\u{26A0}\u{FE0F}'}</span>
+          OVERTIME — Seeker enraged!
+        </div>
+      )}
     </div>
   );
 }

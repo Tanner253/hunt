@@ -74,7 +74,7 @@ export interface ServerToClientEvents {
   'game:state': (state: GameState) => void;
   'game:start': (data: { mapId: string; yourId: string; colorId: string }) => void;
   'game:over': (data: GameOverData) => void;
-  'game:kill': (data: { victimId: string; x: number; y: number }) => void;
+  'game:kill': (data: { victimId: string; victimName: string; x: number; y: number }) => void;
   'game:emote': (data: EmoteEvent) => void;
   'error': (message: string) => void;
 }
