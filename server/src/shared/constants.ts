@@ -27,8 +27,8 @@ export const LOBBY_ARENA_H = 400;
 export const LOBBY_TICK_RATE = 10;
 
 export const MAX_LOBBIES = 10;
-export const MAX_PLAYERS_PER_LOBBY = 10;
-export const FREE_LOBBY_MAX_PLAYERS = 25;
+export const MAX_PLAYERS_PER_LOBBY = 25;
+export const FREE_LOBBY_MAX_PLAYERS = 50;
 export const MIN_PLAYERS_TO_START = 2;
 
 export const COLORS: Record<string, { primary: string; shadow: string; visor: string }> = {
