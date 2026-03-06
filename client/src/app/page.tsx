@@ -143,7 +143,13 @@ export default function HomePage() {
             Last one standing wins
           </p>
 
-          <div className="flex items-center justify-center gap-4">
+          <div className="flex items-center justify-center gap-3 flex-wrap">
+            <span
+              className="px-3 py-1 rounded-full text-xs font-black tracking-widest"
+              style={{ background: 'linear-gradient(135deg, #00FFA3, #03E1FF)', color: '#0a0a0a' }}
+            >
+              OPEN BETA
+            </span>
             <div
               className={`px-3 py-1 rounded-full text-sm font-bold flex items-center gap-2 ${
                 connected ? 'bg-green-900/60 text-green-400' : 'bg-red-900/60 text-red-400'
@@ -157,6 +163,9 @@ export default function HomePage() {
                 {onlineCount} online
               </div>
             )}
+            <div className="px-3 py-1 rounded-full text-xs font-bold bg-purple-900/50 text-purple-300 border border-purple-700/40 animate-pulse">
+              Wagering coming &lt; 3 days!
+            </div>
           </div>
         </div>
 
