@@ -21,7 +21,7 @@ export function registerSocketHandlers(io: IO, lobbyManager: LobbyManager) {
       if (lobby.state !== 'waiting' && lobby.state !== 'countdown') continue;
       if (lobby.players.size === 0) continue;
       lobby.updateLobbyPositions(delta);
-      io.to(`lobby:${lobby.id}`).emit('lobby:positions', lobby.getLobbyPositions());
+      io.to(`lobby:${lobby.id}`).emit('lobby:positions', lobby.getLobbyArenaState());
     }
   }, 1000 / LOBBY_TICK_RATE);
 

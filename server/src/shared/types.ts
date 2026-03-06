@@ -36,6 +36,18 @@ export interface LobbyPositionState {
   isMoving: boolean;
   colorId: string;
   name: string;
+  score: number;
+}
+
+export interface LobbyCoin {
+  id: string;
+  x: number;
+  y: number;
+}
+
+export interface LobbyArenaState {
+  players: LobbyPositionState[];
+  coins: LobbyCoin[];
 }
 
 export interface PlayerInput {
@@ -90,7 +102,7 @@ export interface ServerToClientEvents {
   'lobby:state': (lobby: LobbyInfo) => void;
   'lobby:chat': (message: ChatMessage) => void;
   'lobby:countdown': (seconds: number) => void;
-  'lobby:positions': (positions: LobbyPositionState[]) => void;
+  'lobby:positions': (state: LobbyArenaState) => void;
   'game:state': (state: GameState) => void;
   'game:start': (data: { mapId: string; yourId: string; colorId: string }) => void;
   'game:over': (data: GameOverData) => void;

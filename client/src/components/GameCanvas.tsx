@@ -82,6 +82,7 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (chatOpenRef.current) return;
+      if (e.repeat) return;
       keysRef.current[e.code] = true;
       if (e.code === 'KeyE') setShowEmoteWheel((p) => !p);
       if (e.code === 'KeyT') {

@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import { getSocket } from '@/lib/socket';
-import { LobbyPositionState, PlayerInput } from '@/shared/types';
+import { LobbyArenaState, PlayerInput } from '@/shared/types';
 import { COLORS, LOBBY_ARENA_W, LOBBY_ARENA_H } from '@/shared/constants';
 import { useMobile } from '@/lib/useMobile';
 
@@ -12,14 +12,14 @@ interface LobbyPlaygroundProps {
 
 export function LobbyPlayground({ playerId }: LobbyPlaygroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const positionsRef = useRef<LobbyPositionState[]>([]);
+  const arenaRef = useRef<LobbyArenaState>({ players: [], coins: [] });
   const keysRef = useRef<Record<string, boolean>>({});
   const isMobile = useMobile();
 
   useEffect(() => {
     const socket = getSocket();
-    const handler = (positions: LobbyPositionState[]) => {
-      positionsRef.current = positions;
+    const handler = (state: LobbyArenaState) => {
+      arenaRef.current = state;
     };
     socket.on('lobby:positions', handler);
     return () => { socket.off('lobby:positions', handler); };
@@ -48,11 +48,7 @@ export function LobbyPlayground({ playerId }: LobbyPlaygroundProps) {
         right: !!(k['KeyD'] || k['ArrowRight']),
         seq: Date.now(),
       };
-      if (input.up || input.down || input.left || input.right) {
-        socket.emit('lobby:move', input);
-      } else {
-        socket.emit('lobby:move', { up: false, down: false, left: false, right: false, seq: Date.now() });
-      }
+      socket.emit('lobby:move', input);
     }, 100);
     return () => clearInterval(interval);
   }, []);
@@ -68,8 +64,9 @@ export function LobbyPlayground({ playerId }: LobbyPlaygroundProps) {
       if (!running) return;
       const W = canvas.width;
       const H = canvas.height;
-      const scaleX = W / LOBBY_ARENA_W;
-      const scaleY = H / LOBBY_ARENA_H;
+      const sx = W / LOBBY_ARENA_W;
+      const sy = H / LOBBY_ARENA_H;
+      const arena = arenaRef.current;
 
       ctx.fillStyle = '#111318';
       ctx.fillRect(0, 0, W, H);
@@ -79,14 +76,14 @@ export function LobbyPlayground({ playerId }: LobbyPlaygroundProps) {
       const gridSize = 40;
       for (let x = 0; x < LOBBY_ARENA_W; x += gridSize) {
         ctx.beginPath();
-        ctx.moveTo(x * scaleX, 0);
-        ctx.lineTo(x * scaleX, H);
+        ctx.moveTo(x * sx, 0);
+        ctx.lineTo(x * sx, H);
         ctx.stroke();
       }
       for (let y = 0; y < LOBBY_ARENA_H; y += gridSize) {
         ctx.beginPath();
-        ctx.moveTo(0, y * scaleY);
-        ctx.lineTo(W, y * scaleY);
+        ctx.moveTo(0, y * sy);
+        ctx.lineTo(W, y * sy);
         ctx.stroke();
       }
 
@@ -94,9 +91,15 @@ export function LobbyPlayground({ playerId }: LobbyPlaygroundProps) {
       ctx.lineWidth = 2;
       ctx.strokeRect(1, 1, W - 2, H - 2);
 
-      for (const p of positionsRef.current) {
-        drawMiniChar(ctx, p.x * scaleX, p.y * scaleY, p, p.id === playerId);
+      for (const coin of arena.coins) {
+        drawCoin(ctx, coin.x * sx, coin.y * sy);
       }
+
+      for (const p of arena.players) {
+        drawMiniChar(ctx, p.x * sx, p.y * sy, p, p.id === playerId);
+      }
+
+      drawScoreboard(ctx, arena.players, playerId, W);
 
       requestAnimationFrame(loop);
     };
@@ -108,27 +111,65 @@ export function LobbyPlayground({ playerId }: LobbyPlaygroundProps) {
     <div className="bg-gray-900/60 border border-gray-800 rounded-2xl overflow-hidden">
       <div className="px-5 py-3 border-b border-gray-800 flex items-center justify-between">
         <h3 className="text-white font-bold text-sm uppercase tracking-wider">Lobby Arena</h3>
-        {!isMobile && (
-          <span className="text-gray-600 text-xs">
-            <kbd className="bg-gray-800 px-1.5 py-0.5 rounded text-gray-500 text-[10px] font-mono">WASD</kbd> to move
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          <span className="text-yellow-400 text-xs font-bold">Collect coins while you wait!</span>
+          {!isMobile && (
+            <span className="text-gray-600 text-xs">
+              <kbd className="bg-gray-800 px-1.5 py-0.5 rounded text-gray-500 text-[10px] font-mono">WASD</kbd> to move
+            </span>
+          )}
+        </div>
       </div>
       <canvas
         ref={canvasRef}
         width={600}
         height={400}
         className="w-full"
-        style={{ imageRendering: 'pixelated' }}
       />
     </div>
   );
 }
 
+function drawCoin(ctx: CanvasRenderingContext2D, x: number, y: number) {
+  const t = Date.now() / 400;
+  const pulse = 0.85 + Math.sin(t + x * 0.01) * 0.15;
+  const bob = Math.sin(t + y * 0.02) * 3;
+  const r = 9 * pulse;
+
+  ctx.save();
+  ctx.translate(x, y + bob);
+
+  ctx.fillStyle = 'rgba(255,215,0,0.15)';
+  ctx.beginPath();
+  ctx.arc(0, 0, r + 6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.shadowColor = '#FFD700';
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = '#FFD700';
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  ctx.fillStyle = '#DAA520';
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#FFD700';
+  ctx.font = `bold ${Math.round(r)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('$', 0, 0);
+
+  ctx.restore();
+}
+
 function drawMiniChar(
   ctx: CanvasRenderingContext2D,
   x: number, y: number,
-  p: LobbyPositionState,
+  p: { colorId: string; name: string; facingLeft: boolean; isMoving: boolean; id: string; score: number },
   isMe: boolean,
 ) {
   const colors = COLORS[p.colorId] || COLORS['Blue'];
@@ -170,5 +211,49 @@ function drawMiniChar(
   ctx.textAlign = 'center';
   ctx.fillText(p.name, 0, -20);
 
+  if (p.score > 0) {
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillText(`${p.score}`, 0, -30);
+  }
+
   ctx.restore();
+}
+
+function drawScoreboard(
+  ctx: CanvasRenderingContext2D,
+  players: { name: string; score: number; colorId: string; id: string }[],
+  playerId: string,
+  canvasW: number,
+) {
+  const sorted = [...players].sort((a, b) => b.score - a.score);
+  if (sorted.length === 0 || sorted[0].score === 0) return;
+
+  const top3 = sorted.slice(0, 3);
+  const x = canvasW - 8;
+  let y = 14;
+
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.beginPath();
+  ctx.roundRect(x - 90, 4, 86, top3.length * 16 + 8, 6);
+  ctx.fill();
+
+  ctx.font = 'bold 10px sans-serif';
+  ctx.textAlign = 'right';
+
+  for (let i = 0; i < top3.length; i++) {
+    const p = top3[i];
+    const medal = i === 0 ? '\u{1F947}' : i === 1 ? '\u{1F948}' : '\u{1F949}';
+    const colors = COLORS[p.colorId] || COLORS['Blue'];
+
+    ctx.fillStyle = p.id === playerId ? '#3B82F6' : colors.primary;
+    ctx.textAlign = 'left';
+    ctx.fillText(`${medal} ${p.name}`, x - 82, y);
+
+    ctx.fillStyle = '#FFD700';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${p.score}`, x - 8, y);
+
+    y += 16;
+  }
 }

@@ -1,5 +1,5 @@
 import { v4 as uuid } from 'uuid';
-import { LobbyInfo, LobbyPlayerInfo, LobbyPositionState, ChatMessage } from '../shared/types';
+import { LobbyInfo, LobbyPlayerInfo, LobbyPositionState, LobbyArenaState, LobbyCoin, ChatMessage } from '../shared/types';
 import {
   MAX_LOBBIES,
   MAX_PLAYERS_PER_LOBBY,
@@ -23,6 +23,7 @@ export interface LobbyPlayer {
   lobbyVx: number;
   lobbyVy: number;
   lobbyFacingLeft: boolean;
+  lobbyScore: number;
 }
 
 export interface Spectator {
@@ -42,12 +43,26 @@ export class Lobby {
   game: GameEngine | null = null;
   countdownTimer: ReturnType<typeof setInterval> | null = null;
   chatHistory: ChatMessage[] = [];
+  lobbyCoins: LobbyCoin[] = [];
+  lobbyCoinTimer = 0;
 
   constructor(id: string, name: string, maxPlayers: number, isFree: boolean) {
     this.id = id;
     this.name = name;
     this.maxPlayers = maxPlayers;
     this.isFree = isFree;
+    this.spawnCoins(5);
+  }
+
+  private spawnCoins(count: number) {
+    const pad = 50;
+    for (let i = 0; i < count; i++) {
+      this.lobbyCoins.push({
+        id: uuid(),
+        x: pad + Math.random() * (LOBBY_ARENA_W - pad * 2),
+        y: pad + Math.random() * (LOBBY_ARENA_H - pad * 2),
+      });
+    }
   }
 
   getNextColor(): string {
@@ -69,6 +84,7 @@ export class Lobby {
       lobbyVx: 0,
       lobbyVy: 0,
       lobbyFacingLeft: false,
+      lobbyScore: 0,
     };
     this.players.set(player.id, player);
     return player;
@@ -110,6 +126,8 @@ export class Lobby {
   updateLobbyPositions(delta: number) {
     if (this.state === 'playing') return;
     const pad = 30;
+    const coinPickupRadius = 25;
+
     for (const p of this.players.values()) {
       const isMoving = Math.abs(p.lobbyVx) > 0.1 || Math.abs(p.lobbyVy) > 0.1;
       if (isMoving) {
@@ -120,19 +138,37 @@ export class Lobby {
         if (p.lobbyVx < -0.1) p.lobbyFacingLeft = true;
         if (p.lobbyVx > 0.1) p.lobbyFacingLeft = false;
       }
+
+      for (let i = this.lobbyCoins.length - 1; i >= 0; i--) {
+        const c = this.lobbyCoins[i];
+        if (Math.hypot(p.lobbyX - c.x, p.lobbyY - c.y) < coinPickupRadius) {
+          p.lobbyScore++;
+          this.lobbyCoins.splice(i, 1);
+        }
+      }
+    }
+
+    this.lobbyCoinTimer += delta;
+    if (this.lobbyCoinTimer >= 3 && this.lobbyCoins.length < 5) {
+      this.lobbyCoinTimer = 0;
+      this.spawnCoins(1);
     }
   }
 
-  getLobbyPositions(): LobbyPositionState[] {
-    return Array.from(this.players.values()).map((p) => ({
-      id: p.id,
-      x: Math.round(p.lobbyX),
-      y: Math.round(p.lobbyY),
-      facingLeft: p.lobbyFacingLeft,
-      isMoving: Math.abs(p.lobbyVx) > 0.1 || Math.abs(p.lobbyVy) > 0.1,
-      colorId: p.colorId,
-      name: p.name,
-    }));
+  getLobbyArenaState(): LobbyArenaState {
+    return {
+      players: Array.from(this.players.values()).map((p) => ({
+        id: p.id,
+        x: Math.round(p.lobbyX),
+        y: Math.round(p.lobbyY),
+        facingLeft: p.lobbyFacingLeft,
+        isMoving: Math.abs(p.lobbyVx) > 0.1 || Math.abs(p.lobbyVy) > 0.1,
+        colorId: p.colorId,
+        name: p.name,
+        score: p.lobbyScore,
+      })),
+      coins: this.lobbyCoins,
+    };
   }
 
   cancelCountdown() {
