@@ -124,7 +124,7 @@ export class Lobby {
     if (count < MIN_PLAYERS_TO_START) return false;
     const voted = this.votes.size;
     if (count <= 3) return voted === count;
-    return voted / count >= 0.75;
+    return voted / count >= 0.55;
   }
 
   rollMapCandidates() {

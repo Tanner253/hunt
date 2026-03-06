@@ -21,7 +21,7 @@ export function LobbyRoom({ lobby, playerId, onLeave, countdown }: LobbyRoomProp
   const hasVoted = myPlayer?.hasVoted || false;
   const votedCount = lobby.votes.length;
   const total = lobby.players.length;
-  const threshold = total <= 3 ? total : Math.ceil(total * 0.75);
+  const threshold = total <= 3 ? total : Math.ceil(total * 0.55);
   const voteProgress = threshold > 0 ? votedCount / threshold : 0;
 
   return (
