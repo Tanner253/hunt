@@ -42,8 +42,11 @@ export function GameCanvas({ playerId, mapId, isSpectating, onGameOver }: Props)
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [isDead, setIsDead] = useState(false);
   const [stinkToast, setStinkToast] = useState<string | null>(null);
+  const spectateTargetRef = useRef<string | null>(null);
+  const [spectateName, setSpectateName] = useState<string | null>(null);
   const isMobile = useMobile();
   const chatOpenRef = useRef(false);
+  const isDeadRef = useRef(false);
 
   useEffect(() => { chatOpenRef.current = showChat; }, [showChat]);
 
@@ -60,9 +63,27 @@ export function GameCanvas({ playerId, mapId, isSpectating, onGameOver }: Props)
       setGameState(state);
 
       const me = state.entities.find((e) => e.id === playerId);
-      if (me?.isDead && !isDead) {
+      if (me?.isDead && !isDeadRef.current) {
+        isDeadRef.current = true;
         setIsDead(true);
         gameAudio.playDeath();
+        // Auto-spectate: pick first alive hider, or seeker
+        const alive = state.entities.filter((e) => !e.isDead && e.id !== playerId);
+        if (alive.length > 0) {
+          spectateTargetRef.current = alive[0].id;
+          setSpectateName(alive[0].name || alive[0].role);
+        }
+      }
+      // Keep spectate target valid (if target died, switch)
+      if (isDeadRef.current && spectateTargetRef.current) {
+        const target = state.entities.find((e) => e.id === spectateTargetRef.current);
+        if (!target || (target.isDead && target.role !== 'seeker')) {
+          const alive = state.entities.filter((e) => !e.isDead || e.role === 'seeker');
+          if (alive.length > 0) {
+            spectateTargetRef.current = alive[0].id;
+            setSpectateName(alive[0].name || alive[0].role);
+          }
+        }
       }
 
       // Switch music based on game phase
@@ -148,6 +169,17 @@ export function GameCanvas({ playerId, mapId, isSpectating, onGameOver }: Props)
     };
   }, [onGameOver, playerId, isDead, mapId]);
 
+  const cycleSpectateTarget = useCallback((dir: 1 | -1) => {
+    const state = stateRef.current.current;
+    if (!state) return;
+    const candidates = state.entities.filter((e) => (!e.isDead || e.role === 'seeker') && e.id !== playerId);
+    if (candidates.length === 0) return;
+    const curIdx = candidates.findIndex((e) => e.id === spectateTargetRef.current);
+    const next = (curIdx + dir + candidates.length) % candidates.length;
+    spectateTargetRef.current = candidates[next].id;
+    setSpectateName(candidates[next].name || candidates[next].role);
+  }, [playerId]);
+
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.repeat) return;
@@ -163,11 +195,19 @@ export function GameCanvas({ playerId, mapId, isSpectating, onGameOver }: Props)
       }
       if (chatOpenRef.current) return;
       keysRef.current[e.code] = true;
-      if (e.code === 'KeyE') setShowEmoteWheel((p) => !p);
-      if (e.code === 'Space') {
-        e.preventDefault();
-        getSocket().emit('game:use-item');
-        gameAudio.playStinkBomb();
+
+      if (isDeadRef.current) {
+        if (e.code === 'KeyE' || e.code === 'KeyQ') {
+          cycleSpectateTarget(e.code === 'KeyE' ? 1 : -1);
+          return;
+        }
+      } else {
+        if (e.code === 'KeyE') setShowEmoteWheel((p) => !p);
+        if (e.code === 'Space') {
+          e.preventDefault();
+          getSocket().emit('game:use-item');
+          gameAudio.playStinkBomb();
+        }
       }
     };
     const up = (e: KeyboardEvent) => {
@@ -220,13 +260,14 @@ export function GameCanvas({ playerId, mapId, isSpectating, onGameOver }: Props)
       const state = stateRef.current.current;
       if (state && minimapRef.current) {
         const ents = interpolate(stateRef.current.previous, state, stateRef.current.lastUpdate);
-        const me = ents.find((e) => e.id === playerId);
-        if (me) {
-          cameraRef.current.x += (me.x - canvas.width / 2 - cameraRef.current.x) * 0.1;
-          cameraRef.current.y += (me.y - canvas.height / 2 - cameraRef.current.y) * 0.1;
+        const viewId = (isDeadRef.current && spectateTargetRef.current) ? spectateTargetRef.current : playerId;
+        const viewTarget = ents.find((e) => e.id === viewId) || ents.find((e) => e.id === playerId);
+        if (viewTarget) {
+          cameraRef.current.x += (viewTarget.x - canvas.width / 2 - cameraRef.current.x) * 0.1;
+          cameraRef.current.y += (viewTarget.y - canvas.height / 2 - cameraRef.current.y) * 0.1;
 
           const now = performance.now();
-          if (me.isMoving && !me.isDead && now - footstepTimer.current > 220) {
+          if (viewTarget.isMoving && !viewTarget.isDead && now - footstepTimer.current > 220) {
             footstepTimer.current = now;
             gameAudio.playFootstep();
           }
@@ -236,7 +277,7 @@ export function GameCanvas({ playerId, mapId, isSpectating, onGameOver }: Props)
         drawGame(
           ctx, shadowCanvas, shadowCtx,
           minimapRef.current, minimapRef.current.getContext('2d')!,
-          cameraRef.current, ents, playerId,
+          cameraRef.current, ents, viewId,
           bloodRef.current, canvas.width, canvas.height,
           emotesRef.current,
           state.powerUps || [],
@@ -282,6 +323,29 @@ export function GameCanvas({ playerId, mapId, isSpectating, onGameOver }: Props)
       <HUD gameState={gameState} hasItem={hasItem} hasShield={hasShield} isBoosted={isBoosted} />
       <KillFeed />
       <DeathScreen visible={isDead} />
+
+      {isDead && spectateName && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur px-8 py-3 rounded-2xl border border-gray-700/50 flex items-center gap-6 z-20">
+          <button
+            onClick={() => cycleSpectateTarget(-1)}
+            className="text-white font-bold hover:text-blue-400 transition-colors text-lg"
+          >
+            <kbd className="bg-gray-800 px-2 py-0.5 rounded text-xs mr-1 border border-gray-700">Q</kbd>
+            &#8592;
+          </button>
+          <div className="text-center">
+            <span className="text-gray-500 text-[10px] font-bold uppercase tracking-[0.2em] block">Spectating</span>
+            <span className="text-white font-bold text-sm">{spectateName}</span>
+          </div>
+          <button
+            onClick={() => cycleSpectateTarget(1)}
+            className="text-white font-bold hover:text-blue-400 transition-colors text-lg"
+          >
+            &#8594;
+            <kbd className="bg-gray-800 px-2 py-0.5 rounded text-xs ml-1 border border-gray-700">E</kbd>
+          </button>
+        </div>
+      )}
 
       {stinkToast && (
         <div className="absolute top-24 left-1/2 -translate-x-1/2 z-30 pointer-events-none animate-bounce">
