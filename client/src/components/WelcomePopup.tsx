@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { SocialLinks } from './SocialLinks';
+import { RoadmapGrid } from './RoadmapGrid';
 
 const CA = 'GCeqAE3zchJM1AeLim9e3QzVEtwG3bAqFM9foLeMpump';
 
@@ -10,13 +11,11 @@ export function WelcomePopup() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const seen = sessionStorage.getItem('solvivors-welcome');
-    if (!seen) setOpen(true);
+    setOpen(true);
   }, []);
 
   const dismiss = () => {
     setOpen(false);
-    sessionStorage.setItem('solvivors-welcome', '1');
   };
 
   const copyCA = async () => {
@@ -43,13 +42,13 @@ export function WelcomePopup() {
 
       {/* Modal */}
       <div
-        className="relative w-full max-w-lg bg-gray-950 border border-gray-800 rounded-3xl shadow-2xl shadow-purple-900/20 overflow-hidden animate-scale-in"
+        className="relative w-full max-w-2xl max-h-[90vh] bg-gray-950 border border-gray-800 rounded-3xl shadow-2xl shadow-purple-900/20 overflow-hidden animate-scale-in flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Gradient top bar */}
         <div className="h-1.5 w-full bg-gradient-to-r from-[#00FFA3] via-[#03E1FF] to-[#DC1FFF]" />
 
-        <div className="px-8 py-8">
+        <div className="px-8 py-8 overflow-y-auto">
           {/* Ticker */}
           <div className="text-center mb-6">
             <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-1">
@@ -106,6 +105,12 @@ export function WelcomePopup() {
           {/* Social links */}
           <div className="flex items-center justify-center gap-3 mb-6">
             <SocialLinks size={18} showLabels />
+          </div>
+
+          {/* Roadmap */}
+          <div className="mb-6">
+            <div className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-3">Roadmap</div>
+            <RoadmapGrid compact />
           </div>
 
           {/* Enter button */}
