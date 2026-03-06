@@ -62,3 +62,13 @@ export const TRACKS: Record<string, TrackData> = {
 };
 
 export const LOBBY_TRACKS = ['lobby1', 'lobby2', 'lobby3'];
+
+export const TRACK_NAMES: Record<string, string> = {
+  lobby1: 'Arcade Bounce',
+  lobby2: 'Chill Groove',
+  lobby3: 'Pixel Party',
+  hiding: 'Shadow Creep',
+  hunting: 'The Chase',
+  overtime: 'Final Rush',
+  chase: 'Hot Pursuit',
+};

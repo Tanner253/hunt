@@ -11,6 +11,8 @@ export const HIDE_TIME = 15;
 
 export const STINK_DURATION = 8;
 export const STINK_RANGE = 250;
+export const STINK_PROJECTILE_SPEED = 500;
+export const STINK_PROJECTILE_RADIUS = 12;
 export const POWERUP_PICKUP_RADIUS = 40;
 
 export const LOBBY_ARENA_W = 600;

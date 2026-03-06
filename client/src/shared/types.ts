@@ -19,6 +19,12 @@ export interface PowerUpState {
   y: number;
 }
 
+export interface StinkProjectileState {
+  id: string;
+  x: number;
+  y: number;
+}
+
 export interface GameState {
   tick: number;
   timer: number;
@@ -26,6 +32,7 @@ export interface GameState {
   entities: EntityState[];
   hidersAlive: number;
   powerUps: PowerUpState[];
+  projectiles: StinkProjectileState[];
 }
 
 export interface LobbyPositionState {

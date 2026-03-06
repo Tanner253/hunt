@@ -1,4 +1,4 @@
-import { TrackData, TRACKS, LOBBY_TRACKS } from './tracks';
+import { TrackData, TRACKS, LOBBY_TRACKS, TRACK_NAMES } from './tracks';
 
 const NOTE_FREQ: Record<string, number> = {};
 const NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
@@ -6,6 +6,12 @@ for (let oct = 1; oct <= 7; oct++) {
   NAMES.forEach((name, i) => {
     NOTE_FREQ[`${name}${oct}`] = 440 * Math.pow(2, (i - 9 + (oct - 4) * 12) / 12);
   });
+}
+
+function loadVol(key: string, fallback: number): number {
+  if (typeof window === 'undefined') return fallback;
+  const v = localStorage.getItem(key);
+  return v !== null ? Number(v) : fallback;
 }
 
 class GameAudio {
@@ -19,7 +25,15 @@ class GameAudio {
   private nextStepTime = 0;
   private lobbyTrackIdx = 0;
   private stepCount = 0;
-  private _muted = false;
+  private listeners = new Set<() => void>();
+  private _allowLobbySkip = false;
+
+  private _masterVol = loadVol('hunt-vol-master', 60);
+  private _musicVol = loadVol('hunt-vol-music', 40);
+  private _sfxVol = loadVol('hunt-vol-sfx', 60);
+
+  subscribe(fn: () => void) { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; }
+  private notify() { this.listeners.forEach((fn) => fn()); }
 
   init() {
     if (this.ctx) {
@@ -28,20 +42,59 @@ class GameAudio {
     }
     this.ctx = new AudioContext();
     this.master = this.ctx.createGain();
-    this.master.gain.value = 0.6;
     this.master.connect(this.ctx.destination);
     this.musicGain = this.ctx.createGain();
-    this.musicGain.gain.value = 0.25;
     this.musicGain.connect(this.master);
     this.sfxGain = this.ctx.createGain();
-    this.sfxGain.gain.value = 0.5;
     this.sfxGain.connect(this.master);
+    this.applyVolumes();
   }
 
-  get muted() { return this._muted; }
+  private applyVolumes() {
+    if (this.master) this.master.gain.value = this._masterVol / 100;
+    if (this.musicGain) this.musicGain.gain.value = (this._musicVol / 100) * 0.5;
+    if (this.sfxGain) this.sfxGain.gain.value = (this._sfxVol / 100) * 0.7;
+  }
+
+  private saveVol(key: string, val: number) {
+    if (typeof window !== 'undefined') localStorage.setItem(key, String(val));
+  }
+
+  get masterVolume() { return this._masterVol; }
+  set masterVolume(v: number) {
+    this._masterVol = Math.max(0, Math.min(100, v));
+    this.saveVol('hunt-vol-master', this._masterVol);
+    this.applyVolumes();
+    this.notify();
+  }
+
+  get musicVolume() { return this._musicVol; }
+  set musicVolume(v: number) {
+    this._musicVol = Math.max(0, Math.min(100, v));
+    this.saveVol('hunt-vol-music', this._musicVol);
+    this.applyVolumes();
+    this.notify();
+  }
+
+  get sfxVolume() { return this._sfxVol; }
+  set sfxVolume(v: number) {
+    this._sfxVol = Math.max(0, Math.min(100, v));
+    this.saveVol('hunt-vol-sfx', this._sfxVol);
+    this.applyVolumes();
+    this.notify();
+  }
+
+  get trackId() { return this.currentTrack; }
+  get trackName() { return this.currentTrack ? (TRACK_NAMES[this.currentTrack] || this.currentTrack) : 'None'; }
+  get muted() { return this._masterVol === 0; }
+
   toggleMute() {
-    this._muted = !this._muted;
-    if (this.master) this.master.gain.value = this._muted ? 0 : 0.6;
+    if (this._masterVol > 0) {
+      this.saveVol('hunt-vol-master-prev', this._masterVol);
+      this.masterVolume = 0;
+    } else {
+      this.masterVolume = loadVol('hunt-vol-master-prev', 60);
+    }
   }
 
   // ─── Music ──────────────────────────────────────────────────
@@ -53,16 +106,37 @@ class GameAudio {
     const track = TRACKS[name];
     if (!track) return;
     this.currentTrack = name;
+    this._allowLobbySkip = name.startsWith('lobby');
     this.stepIdx = 0;
     this.stepCount = 0;
     this.nextStepTime = this.ctx.currentTime + 0.05;
     this.seqInterval = window.setInterval(() => this.schedule(track), 25);
+    this.notify();
   }
 
   playLobbyMusic() {
     const name = LOBBY_TRACKS[this.lobbyTrackIdx % LOBBY_TRACKS.length];
+    this._allowLobbySkip = true;
     this.playTrack(name);
   }
+
+  skipTrack() {
+    if (!this._allowLobbySkip) return;
+    this.lobbyTrackIdx++;
+    const name = LOBBY_TRACKS[this.lobbyTrackIdx % LOBBY_TRACKS.length];
+    this.stopMusic();
+    this.playTrack(name);
+  }
+
+  prevTrack() {
+    if (!this._allowLobbySkip) return;
+    this.lobbyTrackIdx = (this.lobbyTrackIdx - 1 + LOBBY_TRACKS.length * 100) % LOBBY_TRACKS.length;
+    const name = LOBBY_TRACKS[this.lobbyTrackIdx % LOBBY_TRACKS.length];
+    this.stopMusic();
+    this.playTrack(name);
+  }
+
+  get canSkip() { return this._allowLobbySkip; }
 
   stopMusic() {
     if (this.seqInterval !== null) {
@@ -70,6 +144,7 @@ class GameAudio {
       this.seqInterval = null;
     }
     this.currentTrack = null;
+    this.notify();
   }
 
   private schedule(track: TrackData) {
@@ -88,6 +163,7 @@ class GameAudio {
           const next = LOBBY_TRACKS[this.lobbyTrackIdx % LOBBY_TRACKS.length];
           if (next !== this.currentTrack) {
             this.currentTrack = next;
+            this.notify();
             const newTrack = TRACKS[next];
             if (newTrack) {
               clearInterval(this.seqInterval!);
@@ -190,8 +266,7 @@ class GameAudio {
   playCoinCollect() {
     if (!this.ctx || !this.sfxGain) return;
     const t = this.ctx.currentTime;
-    const notes = [523, 659, 784, 1047];
-    notes.forEach((freq, i) => {
+    [523, 659, 784, 1047].forEach((freq, i) => {
       this.osc('square', freq, 0.08, t + i * 0.06, 0.12, this.sfxGain!);
     });
   }
@@ -263,8 +338,7 @@ class GameAudio {
   playVictory() {
     if (!this.ctx || !this.sfxGain) return;
     const t = this.ctx.currentTime;
-    const melody = [523, 587, 659, 784, 1047, 784, 1047];
-    melody.forEach((f, i) => {
+    [523, 587, 659, 784, 1047, 784, 1047].forEach((f, i) => {
       this.osc('square', f, 0.15, t + i * 0.12, 0.15, this.sfxGain!);
     });
   }

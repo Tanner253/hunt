@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSocket } from '@/lib/socket';
+import { gameAudio } from '@/lib/audio';
 import { LobbyBrowser } from '@/components/LobbyBrowser';
+import { AudioToggle } from '@/components/AudioToggle';
 
 export default function HomePage() {
   const router = useRouter();
@@ -40,6 +42,21 @@ export default function HomePage() {
     localStorage.setItem('hunt-player-name', playerName.trim());
     router.push(`/game/${lobbyId}`);
   };
+
+  useEffect(() => {
+    const onInteract = () => {
+      gameAudio.init();
+      gameAudio.playLobbyMusic();
+      window.removeEventListener('click', onInteract);
+      window.removeEventListener('keydown', onInteract);
+    };
+    window.addEventListener('click', onInteract);
+    window.addEventListener('keydown', onInteract);
+    return () => {
+      window.removeEventListener('click', onInteract);
+      window.removeEventListener('keydown', onInteract);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-950 text-white relative overflow-hidden">
@@ -177,6 +194,8 @@ export default function HomePage() {
           {' '}for emotes
         </div>
       </div>
+
+      <AudioToggle />
     </div>
   );
 }

@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { getSocket } from '@/lib/socket';
-import { drawGame, initMapRendering } from '@/lib/renderer';
-import { GameState, EntityState, PlayerInput, GameOverData } from '@/shared/types';
+import { drawGame, initMapRendering, cleanupProjectileTrails } from '@/lib/renderer';
+import { GameState, EntityState, PlayerInput, GameOverData, ChatMessage } from '@/shared/types';
 import { MAP_DEFAULT, TICK_RATE } from '@/shared/constants';
 import { useMobile } from '@/lib/useMobile';
 import { gameAudio } from '@/lib/audio';
@@ -31,6 +31,7 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
   const bloodRef = useRef<{ x: number; y: number; r: number }[]>([]);
   const cameraRef = useRef({ x: 0, y: 0 });
   const emotesRef = useRef<Map<string, string>>(new Map());
+  const chatBubblesRef = useRef<Map<string, string>>(new Map());
   const lastPhaseRef = useRef<string>('');
   const lastHasItemRef = useRef(false);
   const footstepTimer = useRef(0);
@@ -38,6 +39,7 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
   const [showChat, setShowChat] = useState(false);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [isDead, setIsDead] = useState(false);
+  const [stinkToast, setStinkToast] = useState<string | null>(null);
   const isMobile = useMobile();
   const chatOpenRef = useRef(false);
 
@@ -100,13 +102,29 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
       setTimeout(() => emotesRef.current.delete(data.playerId), 3000);
       gameAudio.playEmote();
     };
-    const onMarked = () => { gameAudio.playMarked(); };
+    const onMarked = (data: { markerId: string; victimId: string; victimName: string }) => {
+      gameAudio.playMarked();
+      if (data.victimId === playerId) {
+        setStinkToast('You\'ve been stink bombed! The Seeker can smell you!');
+        setTimeout(() => setStinkToast(null), 4000);
+      }
+    };
+    const onChat = (msg: ChatMessage) => {
+      chatBubblesRef.current.set(msg.senderId, msg.text);
+      const text = msg.text;
+      setTimeout(() => {
+        if (chatBubblesRef.current.get(msg.senderId) === text) {
+          chatBubblesRef.current.delete(msg.senderId);
+        }
+      }, 4000);
+    };
 
     socket.on('game:state', onState);
     socket.on('game:kill', onKill);
     socket.on('game:emote', onEmote);
     socket.on('game:over', onGameOver);
     socket.on('game:marked', onMarked);
+    socket.on('lobby:chat', onChat);
 
     return () => {
       socket.off('game:state', onState);
@@ -114,20 +132,27 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
       socket.off('game:emote', onEmote);
       socket.off('game:over', onGameOver);
       socket.off('game:marked', onMarked);
+      socket.off('lobby:chat', onChat);
       gameAudio.stopMusic();
     };
   }, [onGameOver, playerId, isDead]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (chatOpenRef.current) return;
       if (e.repeat) return;
+      if (e.code === 'Enter') {
+        e.preventDefault();
+        if (!chatOpenRef.current) setShowChat(true);
+        return;
+      }
+      if (e.code === 'Escape' && chatOpenRef.current) {
+        e.preventDefault();
+        setShowChat(false);
+        return;
+      }
+      if (chatOpenRef.current) return;
       keysRef.current[e.code] = true;
       if (e.code === 'KeyE') setShowEmoteWheel((p) => !p);
-      if (e.code === 'KeyT') {
-        e.preventDefault();
-        setShowChat(true);
-      }
       if (e.code === 'Space') {
         e.preventDefault();
         getSocket().emit('game:use-item');
@@ -195,6 +220,8 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
             gameAudio.playFootstep();
           }
         }
+        const projs = state.projectiles || [];
+        cleanupProjectileTrails(new Set(projs.map((p) => p.id)));
         drawGame(
           ctx, shadowCanvas, shadowCtx,
           minimapRef.current, minimapRef.current.getContext('2d')!,
@@ -202,6 +229,8 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
           bloodRef.current, canvas.width, canvas.height,
           emotesRef.current,
           state.powerUps || [],
+          chatBubblesRef.current,
+          projs,
         );
       }
       requestAnimationFrame(loop);
@@ -240,6 +269,16 @@ export function GameCanvas({ playerId, isSpectating, onGameOver }: Props) {
       <HUD gameState={gameState} hasItem={hasItem} />
       <KillFeed />
       <DeathScreen visible={isDead} />
+
+      {stinkToast && (
+        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-30 pointer-events-none animate-bounce">
+          <div className="bg-green-900/90 border-2 border-green-400 text-green-200 px-6 py-3 rounded-xl shadow-lg shadow-green-900/50 flex items-center gap-3 text-sm font-bold">
+            <span className="text-2xl">{'\u{1F4A8}'}</span>
+            {stinkToast}
+            <span className="text-2xl">{'\u{1F4A8}'}</span>
+          </div>
+        </div>
+      )}
 
       <InGameChat open={showChat} onClose={() => setShowChat(false)} />
 

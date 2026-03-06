@@ -10,6 +10,8 @@ import {
   PLAYER_RADIUS,
   SEEKER_BOOST_SPEED,
   STINK_DURATION,
+  STINK_PROJECTILE_SPEED,
+  STINK_PROJECTILE_RADIUS,
   POWERUP_SPAWN_INTERVAL,
   POWERUP_PICKUP_RADIUS,
   POWERUP_MAX_ON_MAP,
@@ -29,6 +31,16 @@ interface PowerUp {
   y: number;
 }
 
+interface StinkProjectile {
+  id: string;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  ownerId: string;
+  life: number;
+}
+
 export class GameEngine {
   id: string;
   map: GameMap;
@@ -44,6 +56,7 @@ export class GameEngine {
   emotes: EmoteEvent[] = [];
   powerUps: PowerUp[] = [];
   powerUpSpawnTimer = POWERUP_SPAWN_INTERVAL;
+  projectiles: StinkProjectile[] = [];
 
   constructor(
     id: string,
@@ -101,10 +114,48 @@ export class GameEngine {
     const player = this.players.get(playerId);
     if (!player || player.isDead || !player.heldItem) return;
     const hiders = Array.from(this.players.values());
-    const victim = player.useStinkBomb(hiders, this.map);
-    if (victim) {
-      victim.markedUntil = Date.now() + STINK_DURATION * 1000;
-      this.callbacks.onMarked(playerId, victim.id, victim.name);
+    const result = player.useStinkBomb(hiders, this.map);
+    if (result) {
+      this.projectiles.push({
+        id: uuid(),
+        x: player.x,
+        y: player.y,
+        vx: result.dx * STINK_PROJECTILE_SPEED,
+        vy: result.dy * STINK_PROJECTILE_SPEED,
+        ownerId: playerId,
+        life: 1.5,
+      });
+    }
+  }
+
+  private updateProjectiles(delta: number) {
+    for (let i = this.projectiles.length - 1; i >= 0; i--) {
+      const p = this.projectiles[i];
+      p.x += p.vx * delta;
+      p.y += p.vy * delta;
+      p.life -= delta;
+
+      if (p.life <= 0) {
+        this.projectiles.splice(i, 1);
+        continue;
+      }
+
+      const tileX = Math.floor(p.x / 60);
+      const tileY = Math.floor(p.y / 60);
+      if (tileX < 0 || tileY < 0 || tileX >= this.map.cols || tileY >= this.map.rows || this.map.grid[tileY]?.[tileX] === 1) {
+        this.projectiles.splice(i, 1);
+        continue;
+      }
+
+      for (const [, entity] of this.players) {
+        if (entity.isDead || entity.id === p.ownerId) continue;
+        if (Math.hypot(entity.x - p.x, entity.y - p.y) < PLAYER_RADIUS + STINK_PROJECTILE_RADIUS) {
+          entity.markedUntil = Date.now() + STINK_DURATION * 1000;
+          this.callbacks.onMarked(p.ownerId, entity.id, entity.name);
+          this.projectiles.splice(i, 1);
+          break;
+        }
+      }
     }
   }
 
@@ -141,10 +192,12 @@ export class GameEngine {
     }
 
     if (this.phase === 'hunting') {
-      if (this.timer <= 0) this.seeker.speed = SEEKER_BOOST_SPEED;
+      const isOvertime = this.timer <= 0;
+      if (isOvertime) this.seeker.speed = SEEKER_BOOST_SPEED;
       this.updatePowerUps(delta);
+      this.updateProjectiles(delta);
       const hiders = Array.from(this.players.values());
-      this.seeker.updateAI(delta, hiders, this.map);
+      this.seeker.updateAI(delta, hiders, this.map, isOvertime);
       this.checkKills();
     } else {
       this.seeker.vx = 0;
@@ -251,6 +304,7 @@ export class GameEngine {
       entities,
       hidersAlive: this.getAliveHiders().length,
       powerUps: this.powerUps.map((p) => ({ id: p.id, x: p.x, y: p.y })),
+      projectiles: this.projectiles.map((p) => ({ id: p.id, x: Math.round(p.x), y: Math.round(p.y) })),
     };
   }
 

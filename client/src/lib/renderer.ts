@@ -1,5 +1,5 @@
 import { TILE_SIZE, VISION_RADIUS, COLORS, EMOTES } from '@/shared/constants';
-import { EntityState, PowerUpState } from '@/shared/types';
+import { EntityState, PowerUpState, StinkProjectileState } from '@/shared/types';
 
 interface Wall { x: number; y: number; w: number; h: number }
 interface Segment { p1: { x: number; y: number }; p2: { x: number; y: number } }
@@ -88,6 +88,8 @@ export function drawGame(
   W: number, H: number,
   activeEmotes: Map<string, string>,
   powerUps: PowerUpState[],
+  chatBubbles: Map<string, string>,
+  projectiles: StinkProjectileState[],
 ) {
   const player = entities.find(e => e.id === playerId);
   if (!player) return;
@@ -110,10 +112,11 @@ export function drawGame(
   for (const b of bloodDecals) { ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); }
 
   for (const pu of powerUps) drawPowerUp(ctx, pu);
+  for (const proj of projectiles) drawProjectile(ctx, proj);
 
   const visibleEntities = entities.filter(e => e.visible);
   const sorted = [...visibleEntities].sort((a, b) => a.y - b.y);
-  for (const e of sorted) drawEntity(ctx, e, activeEmotes.get(e.id));
+  for (const e of sorted) drawEntity(ctx, e);
 
   for (const w of walls) {
     if (w.x + w.w < camera.x || w.x > camera.x + W || w.y + w.h < camera.y || w.y > camera.y + H) continue;
@@ -137,6 +140,8 @@ export function drawGame(
   vg.addColorStop(1, 'rgba(0,0,0,0.6)');
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, W, H);
+
+  drawOverlays(ctx, camera, visibleEntities, activeEmotes, chatBubbles);
 
   drawMinimap(minimapCtx, minimapCanvas, entities, player);
 }
@@ -214,9 +219,97 @@ function drawPowerUp(ctx: CanvasRenderingContext2D, pu: PowerUpState) {
   ctx.restore();
 }
 
+const projectileTrails: Map<string, { x: number; y: number }[]> = new Map();
+
+function drawProjectile(ctx: CanvasRenderingContext2D, proj: StinkProjectileState) {
+  let trail = projectileTrails.get(proj.id);
+  if (!trail) {
+    trail = [];
+    projectileTrails.set(proj.id, trail);
+  }
+  trail.push({ x: proj.x, y: proj.y });
+  if (trail.length > 10) trail.shift();
+
+  for (let i = 0; i < trail.length; i++) {
+    const t = trail[i];
+    const alpha = (i / trail.length) * 0.4;
+    const r = 4 + (i / trail.length) * 6;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#44DD22';
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.save();
+  ctx.shadowColor = '#22FF44';
+  ctx.shadowBlur = 18;
+  ctx.fillStyle = '#44FF22';
+  ctx.beginPath();
+  ctx.arc(proj.x, proj.y, 10, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.font = '16px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('\u{1F4A8}', proj.x, proj.y);
+  ctx.restore();
+}
+
+export function cleanupProjectileTrails(activeIds: Set<string>) {
+  for (const key of projectileTrails.keys()) {
+    if (!activeIds.has(key)) projectileTrails.delete(key);
+  }
+}
+
 const PR = 20;
 
-function drawEntity(ctx: CanvasRenderingContext2D, e: EntityState, emoteId?: string) {
+function drawOverlays(
+  ctx: CanvasRenderingContext2D,
+  camera: { x: number; y: number },
+  entities: EntityState[],
+  activeEmotes: Map<string, string>,
+  chatBubbles: Map<string, string>,
+) {
+  for (const e of entities) {
+    if (e.isDead) continue;
+    const emoteId = activeEmotes.get(e.id);
+    const chatMsg = chatBubbles.get(e.id);
+    if (!emoteId && !chatMsg) continue;
+
+    const sx = e.x - camera.x;
+    const sy = e.y - camera.y;
+
+    if (emoteId) {
+      const emote = EMOTES.find(em => em.id === emoteId);
+      if (emote) {
+        ctx.font = '28px sans-serif';
+        ctx.textAlign = 'center';
+        const bob = Math.sin(Date.now() / 300) * 3;
+        ctx.fillText(emote.emoji, sx, sy - PR - 32 + bob);
+      }
+    }
+
+    if (chatMsg) {
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      const tw = ctx.measureText(chatMsg).width;
+      const bx = sx - tw / 2 - 8;
+      const by = sy - PR - (emoteId ? 60 : 40);
+      ctx.fillStyle = 'rgba(0,0,0,0.75)';
+      ctx.beginPath();
+      ctx.roundRect(bx, by - 12, tw + 16, 20, 8);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(chatMsg, sx, by + 3);
+    }
+  }
+}
+
+function drawEntity(ctx: CanvasRenderingContext2D, e: EntityState) {
   if (e.isDead) return;
   const colors = COLORS[e.colorId] || COLORS['Blue'];
   ctx.save();
@@ -270,17 +363,43 @@ function drawEntity(ctx: CanvasRenderingContext2D, e: EntityState, emoteId?: str
   ctx.fillText(name, 0, -PR - 10);
 
   if (e.isMarked) {
-    const t = Date.now() / 400;
-    ctx.globalAlpha = 0.3 + Math.sin(t) * 0.15;
-    ctx.fillStyle = '#44DD22';
-    for (let i = 0; i < 5; i++) {
-      const angle = t + i * (Math.PI * 2 / 5);
-      const ox = Math.cos(angle) * 22;
-      const oy = Math.sin(angle) * 16 - 5;
+    const t = Date.now() / 300;
+
+    for (let ring = 0; ring < 3; ring++) {
+      const ringR = 28 + ring * 10;
+      const ringAlpha = 0.12 - ring * 0.03;
+      ctx.globalAlpha = ringAlpha + Math.sin(t + ring) * 0.04;
+      ctx.fillStyle = '#33CC11';
       ctx.beginPath();
-      ctx.arc(ox, oy, 8 + Math.sin(t + i) * 3, 0, Math.PI * 2);
+      ctx.arc(0, -4, ringR, 0, Math.PI * 2);
       ctx.fill();
     }
+
+    for (let i = 0; i < 8; i++) {
+      const angle = t * 0.8 + i * (Math.PI * 2 / 8);
+      const dist = 18 + Math.sin(t * 1.3 + i * 2) * 8;
+      const ox = Math.cos(angle) * dist;
+      const oy = Math.sin(angle) * (dist * 0.7) - 4;
+      const r = 6 + Math.sin(t + i * 1.5) * 3;
+      ctx.globalAlpha = 0.35 + Math.sin(t + i) * 0.15;
+      ctx.fillStyle = i % 2 === 0 ? '#44DD22' : '#88FF44';
+      ctx.beginPath();
+      ctx.arc(ox, oy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    for (let i = 0; i < 4; i++) {
+      const riseT = ((t * 0.5 + i * 0.7) % 2);
+      const riseY = -PR - 10 - riseT * 30;
+      const riseX = Math.sin(t * 0.6 + i * 3) * 14;
+      const riseAlpha = Math.max(0, 0.4 - riseT * 0.2);
+      ctx.globalAlpha = riseAlpha;
+      ctx.fillStyle = '#66EE33';
+      ctx.beginPath();
+      ctx.arc(riseX, riseY, 4 + riseT * 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     ctx.globalAlpha = 1;
   }
 
@@ -288,15 +407,6 @@ function drawEntity(ctx: CanvasRenderingContext2D, e: EntityState, emoteId?: str
     ctx.font = '14px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('\u{1F4A8}', PR + 12, -PR + 4);
-  }
-
-  if (emoteId) {
-    const emote = EMOTES.find(em => em.id === emoteId);
-    if (emote) {
-      ctx.font = '24px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(emote.emoji, 0, -PR - 30);
-    }
   }
   ctx.restore();
 }

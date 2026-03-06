@@ -138,12 +138,15 @@ export default function GamePage() {
 
   if (pageState === 'gameover' && gameOverData) {
     return (
-      <GameOverScreen
-        data={gameOverData}
-        playerId={playerId}
-        onBackToLobby={() => { setGameOverData(null); setPageState('lobby'); }}
-        onHome={() => router.push('/')}
-      />
+      <>
+        <GameOverScreen
+          data={gameOverData}
+          playerId={playerId}
+          onBackToLobby={() => { setGameOverData(null); setPageState('lobby'); }}
+          onHome={() => router.push('/')}
+        />
+        <AudioToggle />
+      </>
     );
   }
 

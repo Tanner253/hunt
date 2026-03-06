@@ -74,7 +74,7 @@ export class ServerEntity {
     }
   }
 
-  useStinkBomb(allHiders: ServerEntity[], map: GameMap): ServerEntity | null {
+  useStinkBomb(allHiders: ServerEntity[], map: GameMap): { target: ServerEntity; dx: number; dy: number } | null {
     if (this.heldItem !== 'stink' || this.isDead) return null;
     this.heldItem = null;
     let closest: ServerEntity | null = null;
@@ -87,7 +87,11 @@ export class ServerEntity {
         closest = other;
       }
     }
-    return closest;
+    if (!closest) return null;
+    const dx = closest.x - this.x;
+    const dy = closest.y - this.y;
+    const dist = Math.hypot(dx, dy);
+    return { target: closest, dx: dx / dist, dy: dy / dist };
   }
 
   serialize(visible = true): EntityState {
@@ -122,22 +126,27 @@ export class SeekerBot extends ServerEntity {
     this.name = 'The Seeker';
   }
 
-  think(hiders: ServerEntity[], map: GameMap) {
+  think(hiders: ServerEntity[], map: GameMap, overtime = false) {
     let closest: ServerEntity | null = null;
     let minDist = Infinity;
 
-    const markedTarget = hiders.find((h) => !h.isDead && h.isMarked);
-    if (markedTarget) {
-      closest = markedTarget;
-      minDist = Math.hypot(markedTarget.x - this.x, markedTarget.y - this.y);
-    } else {
+    if (overtime) {
       for (const hider of hiders) {
         if (hider.isDead) continue;
         const d = Math.hypot(hider.x - this.x, hider.y - this.y);
-        if (d < SEEKER_VISION_RADIUS && map.checkLineOfSight(this.x, this.y, hider.x, hider.y, SEEKER_VISION_RADIUS)) {
-          if (d < minDist) {
-            minDist = d;
-            closest = hider;
+        if (d < minDist) { minDist = d; closest = hider; }
+      }
+    } else {
+      const markedTarget = hiders.find((h) => !h.isDead && h.isMarked);
+      if (markedTarget) {
+        closest = markedTarget;
+        minDist = Math.hypot(markedTarget.x - this.x, markedTarget.y - this.y);
+      } else {
+        for (const hider of hiders) {
+          if (hider.isDead) continue;
+          const d = Math.hypot(hider.x - this.x, hider.y - this.y);
+          if (d < SEEKER_VISION_RADIUS && map.checkLineOfSight(this.x, this.y, hider.x, hider.y, SEEKER_VISION_RADIUS)) {
+            if (d < minDist) { minDist = d; closest = hider; }
           }
         }
       }
@@ -170,7 +179,7 @@ export class SeekerBot extends ServerEntity {
     }
   }
 
-  updateAI(delta: number, hiders: ServerEntity[], map: GameMap) {
+  updateAI(delta: number, hiders: ServerEntity[], map: GameMap, overtime = false) {
     if (this.isDead) return;
 
     this.waitTimer -= delta;
@@ -180,11 +189,13 @@ export class SeekerBot extends ServerEntity {
       this.investigateTimer += delta;
     }
 
-    const rethinkInterval = this.seekState === 'chase' ? 0.15 : this.seekState === 'investigate' ? 0.25 : 0.5;
+    const rethinkInterval = overtime ? 0.1 : this.seekState === 'chase' ? 0.15 : this.seekState === 'investigate' ? 0.25 : 0.5;
     if (this.waitTimer <= 0 && this.pathTimer <= 0) {
       this.pathTimer = rethinkInterval;
-      this.think(hiders, map);
+      this.think(hiders, map, overtime);
     }
+
+    const arrivalThreshold = Math.max(10, this.speed * delta * 1.5);
 
     if (this.path.length > 0) {
       const next = this.path[0];
@@ -194,7 +205,7 @@ export class SeekerBot extends ServerEntity {
       const dy = ty - this.y;
       const dist = Math.hypot(dx, dy);
 
-      if (dist < 10) {
+      if (dist < arrivalThreshold) {
         this.path.shift();
         if (this.path.length === 0) {
           this.vx = 0;
