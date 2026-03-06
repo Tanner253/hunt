@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { SocialLinks } from './SocialLinks';
 
 const CA = 'GCeqAE3zchJM1AeLim9e3QzVEtwG3bAqFM9foLeMpump';
 
@@ -100,6 +101,11 @@ export function WelcomePopup() {
                 {copied ? 'Copied!' : 'Copy'}
               </button>
             </div>
+          </div>
+
+          {/* Social links */}
+          <div className="flex items-center justify-center gap-3 mb-6">
+            <SocialLinks size={18} showLabels />
           </div>
 
           {/* Enter button */}

@@ -9,6 +9,7 @@ import { AudioToggle } from '@/components/AudioToggle';
 import { CopyCA } from '@/components/CopyCA';
 import { WelcomePopup } from '@/components/WelcomePopup';
 import { BetaBanner } from '@/components/BetaBanner';
+import { SocialLinks } from '@/components/SocialLinks';
 
 export default function HomePage() {
   const router = useRouter();
@@ -77,7 +78,10 @@ export default function HomePage() {
           </span>
           <span className="text-gray-400">vivors</span>
         </div>
-        <CopyCA />
+        <div className="flex items-center gap-2">
+          <SocialLinks size={14} />
+          <CopyCA />
+        </div>
       </div>
 
       {/* Animated grid background */}
