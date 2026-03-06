@@ -28,9 +28,9 @@ class GameAudio {
   private listeners = new Set<() => void>();
   private _allowLobbySkip = false;
 
-  private _masterVol = loadVol('hunt-vol-master', 60);
-  private _musicVol = loadVol('hunt-vol-music', 40);
-  private _sfxVol = loadVol('hunt-vol-sfx', 60);
+  private _masterVol = loadVol('hunt-vol-master', 80);
+  private _musicVol = loadVol('hunt-vol-music', 70);
+  private _sfxVol = loadVol('hunt-vol-sfx', 80);
 
   subscribe(fn: () => void) { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; }
   private notify() { this.listeners.forEach((fn) => fn()); }
@@ -52,8 +52,8 @@ class GameAudio {
 
   private applyVolumes() {
     if (this.master) this.master.gain.value = this._masterVol / 100;
-    if (this.musicGain) this.musicGain.gain.value = (this._musicVol / 100) * 0.5;
-    if (this.sfxGain) this.sfxGain.gain.value = (this._sfxVol / 100) * 0.7;
+    if (this.musicGain) this.musicGain.gain.value = this._musicVol / 100;
+    if (this.sfxGain) this.sfxGain.gain.value = this._sfxVol / 100;
   }
 
   private saveVol(key: string, val: number) {
@@ -178,11 +178,11 @@ class GameAudio {
   private playMusicStep(track: TrackData, step: number, time: number, dur: number) {
     const leadNote = track.lead[step];
     if (leadNote && leadNote !== '_' && NOTE_FREQ[leadNote]) {
-      this.osc('square', NOTE_FREQ[leadNote], dur * 0.7, time, 0.12, this.musicGain!);
+      this.osc('square', NOTE_FREQ[leadNote], dur * 0.7, time, 0.25, this.musicGain!);
     }
     const bassNote = track.bass[step];
     if (bassNote && bassNote !== '_' && NOTE_FREQ[bassNote]) {
-      this.osc('triangle', NOTE_FREQ[bassNote], dur * 0.85, time, 0.18, this.musicGain!);
+      this.osc('triangle', NOTE_FREQ[bassNote], dur * 0.85, time, 0.3, this.musicGain!);
     }
     if (track.kick[step]) this.kick(time);
     if (track.hat[step]) this.hihat(time);
@@ -209,7 +209,7 @@ class GameAudio {
     o.type = 'sine';
     o.frequency.setValueAtTime(150, time);
     o.frequency.exponentialRampToValueAtTime(30, time + 0.12);
-    g.gain.setValueAtTime(0.25, time);
+    g.gain.setValueAtTime(0.45, time);
     g.gain.exponentialRampToValueAtTime(0.001, time + 0.12);
     o.connect(g);
     g.connect(this.musicGain);
@@ -229,7 +229,7 @@ class GameAudio {
     hp.type = 'highpass';
     hp.frequency.value = 7000;
     const g = this.ctx.createGain();
-    g.gain.setValueAtTime(0.08, time);
+    g.gain.setValueAtTime(0.18, time);
     g.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
     src.connect(hp);
     hp.connect(g);
