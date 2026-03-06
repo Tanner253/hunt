@@ -195,7 +195,7 @@ export class SeekerBot extends ServerEntity {
     }
   }
 
-  private updateOvertimeAI(delta: number, hiders: ServerEntity[], map: GameMap) {
+  private updateOvertimeAI(delta: number, hiders: ServerEntity[]) {
     let closest: ServerEntity | null = null;
     let minDist = Infinity;
     for (const h of hiders) {
@@ -205,43 +205,26 @@ export class SeekerBot extends ServerEntity {
     }
     if (!closest) { this.vx = 0; this.vy = 0; return; }
 
-    if (minDist < 150) {
-      const dx = closest.x - this.x;
-      const dy = closest.y - this.y;
+    const dx = closest.x - this.x;
+    const dy = closest.y - this.y;
+    if (minDist > 1) {
       this.vx = (dx / minDist) * this.speed;
       this.vy = (dy / minDist) * this.speed;
-    } else {
-      const path = map.findPath(this.x, this.y, closest.x, closest.y);
-      if (path && path.length > 0) {
-        const skipTo = Math.min(path.length - 1, 4);
-        const wp = path[skipTo];
-        const tx = wp.x * TILE_SIZE + TILE_SIZE / 2;
-        const ty = wp.y * TILE_SIZE + TILE_SIZE / 2;
-        const dx = tx - this.x;
-        const dy = ty - this.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist > 1) {
-          this.vx = (dx / dist) * this.speed;
-          this.vy = (dy / dist) * this.speed;
-        }
-      } else {
-        const dx = closest.x - this.x;
-        const dy = closest.y - this.y;
-        if (minDist > 1) {
-          this.vx = (dx / minDist) * this.speed;
-          this.vy = (dy / minDist) * this.speed;
-        }
-      }
     }
 
-    this.update(delta, map.walls);
+    this.isMoving = true;
+    if (this.vx < -0.1) this.facingLeft = true;
+    if (this.vx > 0.1) this.facingLeft = false;
+    this.walkCycle += delta * 15;
+    this.x += this.vx * delta;
+    this.y += this.vy * delta;
   }
 
   updateAI(delta: number, hiders: ServerEntity[], map: GameMap, overtime = false) {
     if (this.isDead) return;
 
     if (overtime) {
-      this.updateOvertimeAI(delta, hiders, map);
+      this.updateOvertimeAI(delta, hiders);
       return;
     }
 
