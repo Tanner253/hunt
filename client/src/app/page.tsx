@@ -6,6 +6,8 @@ import { getSocket } from '@/lib/socket';
 import { gameAudio } from '@/lib/audio';
 import { LobbyBrowser } from '@/components/LobbyBrowser';
 import { AudioToggle } from '@/components/AudioToggle';
+import { CopyCA } from '@/components/CopyCA';
+import { WelcomePopup } from '@/components/WelcomePopup';
 
 export default function HomePage() {
   const router = useRouter();
@@ -60,6 +62,23 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white relative overflow-hidden">
+      {/* Top nav */}
+      <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 py-3">
+        <div className="text-sm font-black tracking-tight">
+          <span
+            style={{
+              background: 'linear-gradient(135deg, #00FFA3, #03E1FF, #DC1FFF)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}
+          >
+            SOL
+          </span>
+          <span className="text-gray-400">vivors</span>
+        </div>
+        <CopyCA />
+      </div>
+
       {/* Animated grid background */}
       <div className="fixed inset-0 pointer-events-none" aria-hidden>
         <div
@@ -194,6 +213,7 @@ export default function HomePage() {
       </div>
 
       <AudioToggle />
+      <WelcomePopup />
     </div>
   );
 }
