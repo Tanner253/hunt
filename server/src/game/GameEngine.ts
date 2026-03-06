@@ -64,6 +64,7 @@ export class GameEngine {
   powerUps: PowerUp[] = [];
   powerUpSpawnTimer = POWERUP_SPAWN_INTERVAL;
   projectiles: StinkProjectile[] = [];
+  seekerCooldownUntil = 0;
 
   constructor(
     id: string,
@@ -220,8 +221,15 @@ export class GameEngine {
       this.updatePowerUps(delta);
       this.updateProjectiles(delta);
       const hiders = Array.from(this.players.values());
-      this.seeker.updateAI(delta, hiders, this.map, isOvertime);
-      this.checkKills();
+      if (Date.now() < this.seekerCooldownUntil) {
+        this.seeker.vx = 0;
+        this.seeker.vy = 0;
+        this.seeker.isMoving = false;
+        this.seeker.update(delta, this.map.walls);
+      } else {
+        this.seeker.updateAI(delta, hiders, this.map, isOvertime);
+        this.checkKills();
+      }
     } else {
       this.seeker.vx = 0;
       this.seeker.vy = 0;
@@ -288,6 +296,8 @@ export class GameEngine {
           time: (Date.now() - this.startTime) / 1000,
         });
         this.callbacks.onKill(entity.id, entity.name, entity.x, entity.y);
+        this.seekerCooldownUntil = Date.now() + 5000;
+        return;
       }
     }
   }
