@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-const CA = 'GCeqAE3zchJM1AeLim9e3QzVEtwG3bAqFM9foLeMpump';
+const CA = '2cR9HywSUj7mwut47CHNT7wA5Yd1M1xu1rhHLQtyBAGS';
 
 export function CopyCA({ className = '' }: { className?: string }) {
   const [copied, setCopied] = useState(false);

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { SocialLinks } from './SocialLinks';
 import { RoadmapGrid } from './RoadmapGrid';
 
-const CA = 'GCeqAE3zchJM1AeLim9e3QzVEtwG3bAqFM9foLeMpump';
+const CA = '2cR9HywSUj7mwut47CHNT7wA5Yd1M1xu1rhHLQtyBAGS';
 
 export function WelcomePopup() {
   const [open, setOpen] = useState(false);

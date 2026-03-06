@@ -11,7 +11,7 @@ interface ChatPanelProps {
 export function ChatPanel({ lobbyId }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
-  const endRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const socket = getSocket();
@@ -23,7 +23,8 @@ export function ChatPanel({ lobbyId }: ChatPanelProps) {
   }, [lobbyId]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
   const send = () => {
@@ -37,7 +38,7 @@ export function ChatPanel({ lobbyId }: ChatPanelProps) {
       <div className="px-5 py-3 border-b border-gray-800">
         <h3 className="text-white font-bold text-sm uppercase tracking-wider">Chat</h3>
       </div>
-      <div className="flex-1 overflow-y-auto px-5 py-3 space-y-1.5">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-3 space-y-1.5">
         {messages.length === 0 && (
           <p className="text-gray-700 text-sm text-center py-8">No messages yet — say hello!</p>
         )}
@@ -48,7 +49,6 @@ export function ChatPanel({ lobbyId }: ChatPanelProps) {
             <span className="text-gray-400">{msg.text}</span>
           </div>
         ))}
-        <div ref={endRef} />
       </div>
       <div className="px-4 py-3 border-t border-gray-800 flex gap-2">
         <input
